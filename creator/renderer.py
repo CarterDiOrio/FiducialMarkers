@@ -6,6 +6,8 @@ class Renderer:
     """Handles Rendering the fiducials to SVG and a printable format."""
 
     def __init__(self, width: float, height: float):
+        """
+        """
         self.svg = svg.SVG()
         self.width = width
         self.height = height
