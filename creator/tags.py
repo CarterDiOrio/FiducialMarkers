@@ -61,3 +61,25 @@ def pack_tag(tag_family: TagFamily, bits: TagBits) -> TagBits:
     packed_tag.append([1] + ([0] * (size + 2)) + [1])
     packed_tag.append([1] * (size + 4))
     return packed_tag
+
+
+def create_chess_board(width: int, height: int) -> TagBits:
+    """Creates a chessboard pattern
+
+    Args:
+        width (int): the width of the chess board
+        height (int): the height of the chess board.
+
+    Returns:
+        TagBits: The chess board pattern as a bit grid.
+    """
+    bits = []
+    for i in range(height):
+        row = []
+        for j in range(width):
+            if (i + j) % 2 == 0:
+                row.append(1)
+            else:
+                row.append(0)
+        bits.append(row)
+    return bits

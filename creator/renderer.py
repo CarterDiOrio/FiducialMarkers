@@ -5,12 +5,14 @@ from tags import *
 class Renderer:
     """Handles Rendering the fiducials to SVG and a printable format."""
 
+    # px_per_mm = 96 / 25.4  # 96 px/inch / 2.54 cm/inch / 10 mm/cm
+    px_per_mm = 10
+
     def __init__(self, width: float, height: float):
-        """
-        """
-        self.svg = svg.SVG()
-        self.width = width
-        self.height = height
+        """ """
+        self.width = Renderer.to_px(width)
+        self.height = Renderer.to_px(height)
+        self.elements = []
 
     def add_fiducial(self, bits: TagBits, x: float, y: float, size: float):
         """Adds a fiducial to the SVG.
@@ -22,12 +24,15 @@ class Renderer:
             size (float): The size of the tag cells in (mm)
         """
 
-        size = len(bits)
-
+        size = Renderer.to_px(size)
         for i, row in enumerate(bits):
             for j, bit in enumerate(row):
-                if bit:
-                    self.svg.add_rect(x + j * size, y + i * size, size, size, "black")
+                if not bit:
+                    cx = Renderer.to_px(x) + j * size
+                    cy = Renderer.to_px(y) + i * size
+                    self.elements.append(
+                        svg.Rect(x=cx, y=cy, width=size, height=size, stroke_width=0)
+                    )
 
     def to_svg_str(self):
         """Converts the SVG object to a string.
@@ -35,4 +40,18 @@ class Renderer:
         Returns:
             str: The SVG string
         """
-        return self.svg.to_str()
+        return svg.SVG(
+            width=self.width, height=self.height, elements=self.elements
+        ).as_str()
+
+    @staticmethod
+    def to_px(mm: float) -> float:
+        """Converts mm to px.
+
+        Args:
+            mm (float): The size in mm
+
+        Returns:
+            float: The size in px
+        """
+        return mm * Renderer.px_per_mm
