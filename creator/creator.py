@@ -1,34 +1,24 @@
 from tags import *
+from mount import *
 from renderer import *
 from cairosvg import svg2pdf
 
 paper_width = 216
 paper_height = 279.4
 
-tag_bits = to_bits(Tag16h5(), 0)
-tag_bits = pack_tag(Tag16h5(), tag_bits)
-render = Renderer(paper_width, paper_height)
+# Top left marker to top left corner transform (mm)
+T_mp = np.array([[1, 0, 0, 0], [0, 1, 0, -5], [0, 0, 1, -6], [0, 0, 0, 1]])
 
-# top left
-render.add_fiducial(tag_bits, 10, 10, 10)
+tag0 = to_bits(Tag16h5(), 0)
+tag0 = pack_tag(Tag16h5(), tag0)
 
-# top right
-render.add_fiducial(tag_bits, paper_width - 10 * len(tag_bits) - 10, 10, 10)
+render = Renderer(paper_height, paper_width, origin_at_center=True)
 
-# bottom left
-render.add_fiducial(tag_bits, 10, paper_height - 10 * len(tag_bits) - 10, 10)
+chess_board_bits = ChessBoard(11, 8, 24)
 
-# bottom right
-render.add_fiducial(
-    tag_bits,
-    paper_width - 10 * len(tag_bits) - 10,
-    paper_height - 10 * len(tag_bits) - 10,
-    10,
-)
+render.add_rectangular_fiducial(chess_board_bits.to_bits(), 0, 0, 24, centered=True)
 
-# chess_board = create_chess_board(6, 9)
+corner_locations = chess_board_bits.get_corner_locations(centered=True)
 
-
-# render.add_fiducial(chess_board, 10, 10, 25)
-print(render.to_svg_str())
-svg2pdf(bytestring=render.to_svg_str(), write_to="fiducial.pdf", dpi=254)
+render.to_pdf("fiducial.pdf")
+write_mount_configuration("./mount.txt", T_mp, chess_board_bits)

@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Tuple
 from dataclasses import dataclass
+import numpy as np
 
 type TagBits = List[List[int]]
 
@@ -14,7 +15,101 @@ class Tag16h5(TagFamily):
     def __init__(self):
         super().__init__()
         self.length = 4
-        self.tags = [0x231B]
+        self.tags = [
+            0x231B,
+            0x2EA5,
+            0x346A,
+            0x45B9,
+            0x79A6,
+            0x7F6B,
+            0xB358,
+            0xE745,
+            0xFE59,
+            0x156D,
+            0x380B,
+            0xF0AB,
+            0x0D84,
+            0x4736,
+            0x8C72,
+            0xAF10,
+            0x093C,
+            0x93B4,
+            0xA503,
+            0x468F,
+            0xE137,
+            0x5795,
+            0xDF42,
+            0x1C1D,
+            0xE9DC,
+            0x73AD,
+            0xAD5F,
+            0xD530,
+            0x07CA,
+            0xAF2E,
+        ]
+
+
+class ChessBoard:
+    """Models a chess board calibration pattern."""
+
+    def __init__(self, width: int, height: int, square_size: float):
+        """Creates a chess board calibartion pattern
+
+        Args:
+            width (int): the width of the chess board
+            height (int): the height of the chess board
+            square_size (float): the size of each square in mm
+        """
+        self.width: int = width
+        self.height: int = height
+        self.square_size: float = square_size
+
+    def to_bits(self) -> TagBits:
+        """Creates a bit grid of the chess board pattern
+
+        Args:
+            width (int): the width of the chess board
+            height (int): the height of the chess board.
+
+        Returns:
+            TagBits: The chess board pattern as a bit grid.
+        """
+        bits = []
+        for i in range(self.height):
+            row = []
+            for j in range(self.width):
+                if (i + j) % 2 == 0:
+                    row.append(1)
+                else:
+                    row.append(0)
+            bits.append(row)
+        return bits
+
+    def get_corner_locations(self, centered=False) -> np.ndarray:
+        """Gets internal corner_locations in mm.
+
+        The ordering of the corners matches what opencv would return.
+
+        Args:
+            centered (bool, optional): Whether or not the origin of the chessboard is at its center
+                or at the top left corner
+
+        Returns:
+            np.ndarray: The internal corner locations in mm.
+        """
+
+        corner_locations = []
+        for r in range(1, self.height):
+            for c in range(1, self.width):
+                cx = c * self.square_size
+                cy = r * self.square_size
+
+                if centered:
+                    cx -= (self.width * self.square_size) / 2
+                    cy -= (self.height * self.square_size) / 2
+
+                corner_locations.append([cx, cy])
+        return np.array(corner_locations)
 
 
 def to_bits(tag_family: TagFamily, n: int) -> TagBits:
@@ -61,25 +156,3 @@ def pack_tag(tag_family: TagFamily, bits: TagBits) -> TagBits:
     packed_tag.append([1] + ([0] * (size + 2)) + [1])
     packed_tag.append([1] * (size + 4))
     return packed_tag
-
-
-def create_chess_board(width: int, height: int) -> TagBits:
-    """Creates a chessboard pattern
-
-    Args:
-        width (int): the width of the chess board
-        height (int): the height of the chess board.
-
-    Returns:
-        TagBits: The chess board pattern as a bit grid.
-    """
-    bits = []
-    for i in range(height):
-        row = []
-        for j in range(width):
-            if (i + j) % 2 == 0:
-                row.append(1)
-            else:
-                row.append(0)
-        bits.append(row)
-    return bits
