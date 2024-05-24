@@ -1,15 +1,17 @@
 #include "comparator/vicon.hpp"
 #include <DataStreamClient.h>
 #include <IDataStreamClientBase.h>
+#include <iostream>
+#include <memory>
 
 
 namespace vicon
 {
 
-std::optional<datastream::Client> connect_to_server(const std::string & server)
+std::optional<std::unique_ptr<datastream::Client>> connect_to_server(const std::string & server)
 {
-  auto client = datastream::Client{};
-  auto result = client.Connect(server);
+  auto client = std::make_unique<datastream::Client>();
+  auto result = client->Connect(server);
 
   if (result.Result != datastream::Result::Success) {
     return {};
@@ -31,6 +33,7 @@ bool configure_datastream(datastream::Client & client)
   if (enable_segment_result.Result != datastream::Result::Success) {
     return false;
   }
+
 
   client.SetStreamMode(datastream::StreamMode::ClientPull);
 

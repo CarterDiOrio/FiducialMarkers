@@ -1,6 +1,7 @@
 #include "comparator/mount.hpp"
 #include <fstream>
 #include <sstream>
+#include <iostream>
 
 std::vector<std::string> tok(const std::string & line, char delim = ',')
 {
@@ -28,6 +29,8 @@ Mount load_mount(const std::string & file_path)
     }
   }
 
+  std::cout << "Read mount file..." << std::endl;
+
   // parse the transform from the file
   Eigen::Matrix4d T_mp;
   const auto & float_tokens = tok(lines[0]);
@@ -36,6 +39,8 @@ Mount load_mount(const std::string & file_path)
       T_mp(i, j) = std::stof(float_tokens[i * 4 + j]);
     }
   }
+
+  std::cout << "Parsed transform..." << std::endl;
 
   // parse the fiducial type from the file
   FiducialType fiducial_id;
@@ -48,12 +53,16 @@ Mount load_mount(const std::string & file_path)
   // parse the fiducial parameters from the file
   std::string fiducial_parameters = lines[2];
 
+  std::cout << "Parsed fiducial type and parameters..." << std::endl;
+
   // parse the fiducial corners from the file
   std::vector<Eigen::Vector3d> fiducial_corners;
   for (size_t i = 3; i < lines.size(); i++) {
     const auto & tokens = tok(lines[i]);
     fiducial_corners.push_back({std::stof(tokens[0]), std::stof(tokens[1]), 0});
   }
+
+  std::cout << "Parsed fiducial corners..." << std::endl;
 
   return Mount{
     .T_mp = T_mp,

@@ -30,13 +30,13 @@ set_target_properties(datastream PROPERTIES
 # you don't need or want to.
 # name is the name of the library without the extension or lib prefix
 # name creates a cmake "target"
-add_executable(comparator 
-                src/client.cpp 
+add_executable(calibrate_extrinsics 
+                src/calibrate_extrinsics.cpp 
                 src/tracked_object.cpp 
                 src/vicon.cpp
                 src/mount.cpp)
 
-target_link_libraries(comparator datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS})
+target_link_libraries(calibrate_extrinsics datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS})
 
 # Use target_include_directories so that #include"mylibrary/header.hpp" works
 # The use of the <BUILD_INTERFACE> and <INSTALL_INTERFACE> is because when
@@ -44,7 +44,7 @@ target_link_libraries(comparator datastream Eigen3::Eigen realsense2 ${OpenCV_LI
 # During build, the headers are read from the source code directory
 # When used from the installed location, headers are in the
 # system include/ directory
-target_include_directories(comparator
+target_include_directories(calibrate_extrinsics
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:include/>)
@@ -52,20 +52,13 @@ target_include_directories(comparator
 # specify additional compilation flags for the library
 # Public causes the flags to propagate to anything
 # that links against this library
-target_compile_options(comparator PUBLIC -Wall -Wextra -pedantic)
+target_compile_options(calibrate_extrinsics PUBLIC -Wall -Wextra -pedantic)
 
 # Enable c++17 support.
 # Public causes the features to propagate to anything
 # that links against this library
-target_compile_features(comparator PUBLIC cxx_std_20)
+target_compile_features(calibrate_extrinsics PUBLIC cxx_std_20)
 
-
-# Use target_link_libraries to add dependencies to a "target"
-# (e.g., a library or executable)
-# This will automatically add all required library files
-# that need to be linked
-# and paths to th locations of header files
-#target_link_libraries(Name Eigen3::Eigen libname)
 
 # install the include files by copying the whole include directory
 # install(DIRECTORY include/mylibrary DESTINATION include)

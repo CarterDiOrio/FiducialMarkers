@@ -26,7 +26,7 @@ std::optional<Eigen::Matrix4d> get_object_transform(
   Eigen::Map<Eigen::Matrix3d> rotation(segment_global_rotation.Rotation);
 
   Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
-  pose.block<3, 3>(0, 0) = rotation;
+  pose.block<3, 3>(0, 0) = rotation.transpose();
   pose.block<3, 1>(0, 3) = Eigen::Map<Eigen::Vector3d>(
     segment_global_translation.Translation);
 

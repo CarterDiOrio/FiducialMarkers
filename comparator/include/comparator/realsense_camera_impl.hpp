@@ -63,7 +63,7 @@ public:
       pipeline.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().
       get_intrinsics();
 
-    cv::Mat intrinsics(3, 3, CV_64F);
+    cv::Mat intrinsics = cv::Mat::zeros(3, 3, CV_64F);
     intrinsics.at<double>(0, 0) = realsense_intrinsics.fx;
     intrinsics.at<double>(0, 2) = realsense_intrinsics.ppx;
     intrinsics.at<double>(1, 1) = realsense_intrinsics.fy;

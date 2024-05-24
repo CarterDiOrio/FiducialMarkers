@@ -109,6 +109,15 @@ class ChessBoard:
                     cy -= (self.height * self.square_size) / 2
 
                 corner_locations.append([cx, cy])
+
+        # transform all the corners by a transformation matrix
+        T = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+
+        for i in range(len(corner_locations)):
+            corner = corner_locations[i]
+            transformed = T @ np.array([corner[0], corner[1], 0, 1])
+            corner_locations[i] = list(transformed[:2])
+
         return np.array(corner_locations)
 
 
