@@ -26,6 +26,11 @@ set_target_properties(datastream PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/lib/datastream/"
 )
 
+set(BOOST_REQUIRED_COMPONENTS
+  program_options
+)
+set(BOOST_MIN_VERSION 1.70.0)
+
 # Create a library.  Can specify if it is shared or static but usually
 # you don't need or want to.
 # name is the name of the library without the extension or lib prefix
@@ -34,9 +39,20 @@ add_executable(calibrate_extrinsics
                 src/calibrate_extrinsics.cpp 
                 src/tracked_object.cpp 
                 src/vicon.cpp
+                src/mount.cpp
+                src/measurement.cpp)
+
+add_executable(chessboard_test
+                src/chessboard_test.cpp
                 src/mount.cpp)
 
-target_link_libraries(calibrate_extrinsics datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS})
+find_package(
+    Boost ${BOOST_MIN_VERSION} REQUIRED
+    COMPONENTS ${BOOST_REQUIRED_COMPONENTS}
+)
+
+target_link_libraries(calibrate_extrinsics datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS} Boost::program_options)
+target_link_libraries(chessboard_test Eigen3::Eigen ${OpenCV_LIBS} realsense2)
 
 # Use target_include_directories so that #include"mylibrary/header.hpp" works
 # The use of the <BUILD_INTERFACE> and <INSTALL_INTERFACE> is because when
@@ -49,15 +65,17 @@ target_include_directories(calibrate_extrinsics
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:include/>)
 
-# specify additional compilation flags for the library
-# Public causes the flags to propagate to anything
-# that links against this library
-target_compile_options(calibrate_extrinsics PUBLIC -Wall -Wextra -pedantic)
+target_include_directories(chessboard_test
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+    $<INSTALL_INTERFACE:include/>)
 
-# Enable c++17 support.
-# Public causes the features to propagate to anything
-# that links against this library
+
+target_compile_options(calibrate_extrinsics PUBLIC -Wall -Wextra -pedantic)
+target_compile_options(chessboard_test PUBLIC -Wall -Wextra -pedantic)
+
 target_compile_features(calibrate_extrinsics PUBLIC cxx_std_20)
+target_compile_features(chessboard_test PUBLIC cxx_std_20)
 
 
 # install the include files by copying the whole include directory

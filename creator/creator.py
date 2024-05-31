@@ -14,9 +14,9 @@ tag0 = pack_tag(Tag16h5(), tag0)
 
 render = Renderer(paper_height, paper_width, origin_at_center=True)
 
-chess_board_bits = ChessBoard(11, 8, 24)
+chess_board_bits = ChessBoard(11, 8, 20)
 
-render.add_rectangular_fiducial(chess_board_bits.to_bits(), 0, 0, 24, centered=True)
+render.add_rectangular_fiducial(chess_board_bits.to_bits(), 0, 0, 20, centered=True)
 
 corner_locations = chess_board_bits.get_corner_locations(centered=True)
 
