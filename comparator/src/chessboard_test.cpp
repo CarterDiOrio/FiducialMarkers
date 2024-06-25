@@ -18,8 +18,10 @@ Mount init_mount(const std::string & file_path)
   auto mount = load_mount(file_path);
   std::cout << "Loaded Mount: " << std::endl;
   std::cout << "  " << "Mount Id: " << mount.fiducial_id << std::endl;
-  std::cout << "  " << "Mount Parameters: " << mount.fiducial_parameters << std::endl;
-  std::cout << "  " << "Mount Num Corners: " << mount.fiducial_corners.size() << std::endl;
+  std::cout << "  " << "Mount Parameters: " << mount.fiducial_parameters <<
+    std::endl;
+  std::cout << "  " << "Mount Num Corners: " << mount.fiducial_corners.size() <<
+    std::endl;
   return mount;
 }
 
@@ -51,7 +53,8 @@ int main()
     //refine the corners using subpixels
     auto winSize = cv::Size(5, 5);
     auto zeroZone = cv::Size(-1, -1);
-    auto criteria = cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 40, 0.001);
+    auto criteria = cv::TermCriteria(
+      cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 40, 0.001);
     cv::cornerSubPix(gray, corners, winSize, zeroZone, criteria);
 
     // create the world points
@@ -76,7 +79,9 @@ int main()
 
     // find reprojection error
     std::vector<cv::Point2f> reprojected_points;
-    cv::projectPoints(world_points, rvec, tvec, K, cv::noArray(), reprojected_points);
+    cv::projectPoints(
+      world_points, rvec, tvec, K,
+      cv::noArray(), reprojected_points);
 
     double error = 0;
     for (size_t i = 0; i < corners.size(); i++) {
@@ -91,7 +96,8 @@ int main()
     Eigen::Matrix3d R_eig;
     cv::cv2eigen(R, R_eig);
 
-    Eigen::Vector3d T = {tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2)};
+    Eigen::Vector3d T =
+    {tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2)};
     Eigen::Matrix4d T_wc = Eigen::Matrix4d::Identity();
     T_wc.block<3, 3>(0, 0) = R_eig.transpose();
     T_wc.block<3, 1>(0, 3) = -R_eig.transpose() * T;

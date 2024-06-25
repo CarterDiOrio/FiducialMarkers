@@ -15,7 +15,8 @@ project(vicon_comparator)
 # https://eigen.tuxfamily.org/dox/TopicCMakeGuide.html
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(realsense2 REQUIRED)
-
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(Ceres REQUIRED)
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
@@ -35,12 +36,17 @@ set(BOOST_MIN_VERSION 1.70.0)
 # you don't need or want to.
 # name is the name of the library without the extension or lib prefix
 # name creates a cmake "target"
-add_executable(calibrate_extrinsics 
-                src/calibrate_extrinsics.cpp 
-                src/tracked_object.cpp 
-                src/vicon.cpp
-                src/mount.cpp
-                src/measurement.cpp)
+add_library(comparator
+              src/calibrate_extrinsics.cpp 
+              src/tracked_object.cpp 
+              src/vicon.cpp
+              src/mount.cpp
+              src/measurement.cpp
+              src/extrinsic_observation.cpp
+              src/mrcal_reprojected_camera.cpp)
+
+
+add_executable(calibrate_extrinsics src/calibrate_extrinsics.cpp)
 
 add_executable(chessboard_test
                 src/chessboard_test.cpp
@@ -51,7 +57,8 @@ find_package(
     COMPONENTS ${BOOST_REQUIRED_COMPONENTS}
 )
 
-target_link_libraries(calibrate_extrinsics datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS} Boost::program_options)
+target_link_libraries(comparator datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS} Boost::program_options)
+target_link_libraries(calibrate_extrinsics comparator)
 target_link_libraries(chessboard_test Eigen3::Eigen ${OpenCV_LIBS} realsense2)
 
 # Use target_include_directories so that #include"mylibrary/header.hpp" works
@@ -60,6 +67,11 @@ target_link_libraries(chessboard_test Eigen3::Eigen ${OpenCV_LIBS} realsense2)
 # During build, the headers are read from the source code directory
 # When used from the installed location, headers are in the
 # system include/ directory
+target_include_directories(comparator
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+    $<INSTALL_INTERFACE:include/>)
+
 target_include_directories(calibrate_extrinsics
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
@@ -70,10 +82,11 @@ target_include_directories(chessboard_test
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:include/>)
 
-
+target_compile_options(comparator PUBLIC -Wall -Wextra -pedantic)
 target_compile_options(calibrate_extrinsics PUBLIC -Wall -Wextra -pedantic)
 target_compile_options(chessboard_test PUBLIC -Wall -Wextra -pedantic)
 
+target_compile_features(comparator PUBLIC cxx_std_20)
 target_compile_features(calibrate_extrinsics PUBLIC cxx_std_20)
 target_compile_features(chessboard_test PUBLIC cxx_std_20)
 

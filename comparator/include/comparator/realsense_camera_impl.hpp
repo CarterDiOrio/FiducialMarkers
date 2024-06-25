@@ -7,7 +7,6 @@
 #include <librealsense2/rs.hpp>
 #include "comparator/camera.hpp"
 
-
 class RealSenseCamera : public CameraIntf
 {
 public:
@@ -23,13 +22,24 @@ public:
   : CameraIntf()
   {
     rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_BGR8, framerate);
+    cfg.enable_stream(
+      RS2_STREAM_COLOR, width, height, RS2_FORMAT_BGR8,
+      framerate);
     pipeline.start(cfg);
   }
 
   explicit RealSenseCamera(rs2::config cfg)
   {
     pipeline.start(cfg);
+  }
+
+  virtual cv::Size get_resolution() const override
+  {
+    const auto realsense_intrinsics =
+      pipeline.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>()
+      .
+      get_intrinsics();
+    return cv::Size(realsense_intrinsics.width, realsense_intrinsics.height);
   }
 
   virtual cv::Mat get_frame() const override
@@ -60,7 +70,8 @@ public:
   virtual cv::Mat get_intrinsics() const override
   {
     const auto realsense_intrinsics =
-      pipeline.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().
+      pipeline.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>()
+      .
       get_intrinsics();
 
     cv::Mat intrinsics = cv::Mat::zeros(3, 3, CV_64F);

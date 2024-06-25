@@ -14,11 +14,11 @@ tag0 = pack_tag(Tag16h5(), tag0)
 
 render = Renderer(paper_height, paper_width, origin_at_center=True)
 
-chess_board_bits = ChessBoard(11, 8, 20)
+chess_board_bits = ChessBoard(10, 10, 15, gingham_format=True)
 
-render.add_rectangular_fiducial(chess_board_bits.to_bits(), 0, 0, 20, centered=True)
+render.add_rectangular_fiducial(chess_board_bits.to_bits(), 0, 0, 15, centered=True)
 
-corner_locations = chess_board_bits.get_corner_locations(centered=True)
+# corner_locations = chess_board_bits.get_corner_locations(centered=True)
 
 render.to_pdf("fiducial.pdf")
-write_mount_configuration("./mount.txt", T_mp, chess_board_bits)
+# write_mount_configuration("./mount.txt", T_mp, chess_board_bits)

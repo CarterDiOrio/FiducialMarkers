@@ -52,17 +52,29 @@ class Tag16h5(TagFamily):
 class ChessBoard:
     """Models a chess board calibration pattern."""
 
-    def __init__(self, width: int, height: int, square_size: float):
+    def __init__(
+        self, width: int, height: int, square_size: float, gingham_format: bool = False
+    ):
         """Creates a chess board calibartion pattern
 
         Args:
             width (int): the width of the chess board
             height (int): the height of the chess board
             square_size (float): the size of each square in mm
+            gingham_format (bool, optional): Whether or not the pattern is in gingham format. Defaults to False.
         """
         self.width: int = width
         self.height: int = height
         self.square_size: float = square_size
+        self.gingham_format: bool = gingham_format
+
+        if self.gingham_format:
+            if self.width != self.height:
+                raise ValueError("Gingham format only supports square chess boards")
+            if self.width % 2 != 0 or self.height % 2 != 0:
+                raise ValueError("Gingham format only supports even sized chess boards")
+            self.width -= 1
+            self.height -= 1
 
     def to_bits(self) -> TagBits:
         """Creates a bit grid of the chess board pattern
@@ -74,6 +86,9 @@ class ChessBoard:
         Returns:
             TagBits: The chess board pattern as a bit grid.
         """
+        if self.gingham_format:
+            return self._gingham_bits()
+
         bits = []
         for i in range(self.height):
             row = []
@@ -82,6 +97,44 @@ class ChessBoard:
                     row.append(1)
                 else:
                     row.append(0)
+            bits.append(row)
+        return bits
+
+    def _gingham_bits(self) -> TagBits:
+        """Creates a gingham bit grid of the chess board pattern"""
+
+        bits = []
+        padded_width = self.width + 4
+        padded_height = self.height + 4
+
+        def is_black(r, c):
+            # 4 corners
+            if r < 2 and c < 2:
+                return False
+            elif r < 2 and c >= padded_width - 2:
+                return False
+            elif r >= padded_height - 2 and c < 2:
+                return False
+            elif r >= padded_height - 2 and c >= padded_width - 2:
+                return False
+
+            # outside non corner rows and cols
+            elif r < 2:
+                return c % 2 == 0
+            elif c < 2:
+                return r % 2 == 0
+            elif r >= padded_height - 2:
+                return c % 2 == 0
+            elif c >= padded_width - 2:
+                return r % 2 == 0
+
+            # internal chess board
+            return (r + c) % 2 != 0
+
+        for r in range(padded_height):
+            row = []
+            for c in range(padded_width):
+                row.append(1 if not is_black(r, c) else 0)
             bits.append(row)
         return bits
 

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # read the x,y,z position.csv file
-data = np.genfromtxt('../position.csv', delimiter=',', skip_header=1)
+data = np.genfromtxt('../multimodal.csv', delimiter=',', skip_header=1)
 x = data[:, 0]
 y = data[:, 1]
 z = data[:, 2]
