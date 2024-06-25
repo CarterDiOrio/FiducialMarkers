@@ -2,7 +2,10 @@
 #define INC_GUARD_MRCAL_REPROJECTED_CAMERA_HPP
 
 #include "comparator/camera.hpp"
-#include <mrcal/mrcal.h>
+
+extern "C" {
+  #include <mrcal/mrcal.h>
+}
 #include <opencv2/core/types.hpp>
 
 /// \brief The reprojection maps

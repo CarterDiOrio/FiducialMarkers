@@ -1,0 +1,21 @@
+/usr/bin/cmake -S/home/cdiorio/ws/fiducials/comparator -B/home/cdiorio/ws/fiducials/comparator/build --check-build-system CMakeFiles/Makefile.cmake 0
+/usr/bin/cmake -E cmake_progress_start /home/cdiorio/ws/fiducials/comparator/build/CMakeFiles /home/cdiorio/ws/fiducials/comparator/build//CMakeFiles/progress.marks
+/usr/bin/gmake  -f CMakeFiles/Makefile2 all
+gmake[1]: Entering directory '/home/cdiorio/ws/fiducials/comparator/build'
+/usr/bin/gmake  -f CMakeFiles/comparator.dir/build.make CMakeFiles/comparator.dir/depend
+gmake[2]: Entering directory '/home/cdiorio/ws/fiducials/comparator/build'
+cd /home/cdiorio/ws/fiducials/comparator/build && /usr/bin/cmake -E cmake_depends "Unix Makefiles" /home/cdiorio/ws/fiducials/comparator /home/cdiorio/ws/fiducials/comparator /home/cdiorio/ws/fiducials/comparator/build /home/cdiorio/ws/fiducials/comparator/build /home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/DependInfo.cmake --color=
+Dependencies file "CMakeFiles/comparator.dir/src/calibrate_extrinsics.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/chessboard.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/extrinsic_observation.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/measurement.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/mount.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/mrcal_reprojected_camera.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/tracked_object.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Dependencies file "CMakeFiles/comparator.dir/src/vicon.cpp.o.d" is newer than depends file "/home/cdiorio/ws/fiducials/comparator/build/CMakeFiles/comparator.dir/compiler_depend.internal".
+Consolidate compiler generated dependencies of target comparator
+gmake[2]: Leaving directory '/home/cdiorio/ws/fiducials/comparator/build'
+/usr/bin/gmake  -f CMakeFiles/comparator.dir/build.make CMakeFiles/comparator.dir/build
+gmake[2]: Entering directory '/home/cdiorio/ws/fiducials/comparator/build'
+[  9%] Building CXX object CMakeFiles/comparator.dir/src/calibrate_extrinsics.cpp.o
+/usr/bin/c++ -DBOOST_ALL_NO_LIB -DBOOST_PROGRAM_OPTIONS_DYN_LINK -DEIGEN_MPL2_ONLY -DFMT_LOCALE -DFMT_SHARED -I/home/cdiorio/ws/fiducials/comparator/include -isystem /usr/include/opencv4 -isystem /home/cdiorio/ws/fiducials/comparator/lib/datastream -isystem /usr/local/include/eigen3 -isystem /usr/include/mrcal -O3 -DNDEBUG -Wall -Wextra -pedantic -MD -MT CMakeFiles/comparator.dir/src/calibrate_extrinsics.cpp.o -MF CMakeFiles/comparator.dir/src/calibrate_extrinsics.cpp.o.d -o CMakeFiles/comparator.dir/src/calibrate_extrinsics.cpp.o -c /home/cdiorio/ws/fiducials/comparator/src/calibrate_extrinsics.cpp

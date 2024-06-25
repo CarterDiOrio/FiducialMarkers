@@ -21,4 +21,4 @@ render.add_rectangular_fiducial(chess_board_bits.to_bits(), 0, 0, 15, centered=T
 # corner_locations = chess_board_bits.get_corner_locations(centered=True)
 
 render.to_pdf("fiducial.pdf")
-# write_mount_configuration("./mount.txt", T_mp, chess_board_bits)
+write_mount_configuration("./mount.txt", T_mp, chess_board_bits)

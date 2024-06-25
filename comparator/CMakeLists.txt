@@ -17,7 +17,16 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(realsense2 REQUIRED)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(Ceres REQUIRED)
+find_package(Sophus REQUIRED)
 find_package( OpenCV REQUIRED )
+
+# find and import mrcal
+add_library(mrcal SHARED IMPORTED)
+set_target_properties(mrcal PROPERTIES
+  IMPORTED_LOCATION "/usr/lib/x86_64-linux-gnu/libmrcal.so"
+  INTERFACE_INCLUDE_DIRECTORIES "/usr/include/mrcal/"
+)
+
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 # add vicon library
@@ -37,29 +46,34 @@ set(BOOST_MIN_VERSION 1.70.0)
 # name is the name of the library without the extension or lib prefix
 # name creates a cmake "target"
 add_library(comparator
-              src/calibrate_extrinsics.cpp 
               src/tracked_object.cpp 
               src/vicon.cpp
-              src/mount.cpp
               src/measurement.cpp
               src/extrinsic_observation.cpp
-              src/mrcal_reprojected_camera.cpp)
+              src/mrcal_reprojected_camera.cpp
+              src/mount.cpp
+              src/chessboard.cpp)
 
 
 add_executable(calibrate_extrinsics src/calibrate_extrinsics.cpp)
 
-add_executable(chessboard_test
-                src/chessboard_test.cpp
-                src/mount.cpp)
+# add_executable(chessboard_test
+#                 src/chessboard_test.cpp)
 
 find_package(
     Boost ${BOOST_MIN_VERSION} REQUIRED
     COMPONENTS ${BOOST_REQUIRED_COMPONENTS}
 )
 
-target_link_libraries(comparator datastream Eigen3::Eigen realsense2 ${OpenCV_LIBS} Boost::program_options)
+target_link_libraries(comparator datastream 
+                                 Eigen3::Eigen 
+                                 realsense2 
+                                 ${OpenCV_LIBS} 
+                                 Boost::program_options
+                                 Sophus::Sophus
+                                 mrcal)
 target_link_libraries(calibrate_extrinsics comparator)
-target_link_libraries(chessboard_test Eigen3::Eigen ${OpenCV_LIBS} realsense2)
+# target_link_libraries(chessboard_test Eigen3::Eigen ${OpenCV_LIBS} realsense2)
 
 # Use target_include_directories so that #include"mylibrary/header.hpp" works
 # The use of the <BUILD_INTERFACE> and <INSTALL_INTERFACE> is because when
@@ -77,18 +91,18 @@ target_include_directories(calibrate_extrinsics
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
     $<INSTALL_INTERFACE:include/>)
 
-target_include_directories(chessboard_test
-    PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
-    $<INSTALL_INTERFACE:include/>)
+# target_include_directories(chessboard_test
+#     PUBLIC
+#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
+#     $<INSTALL_INTERFACE:include/>)
 
 target_compile_options(comparator PUBLIC -Wall -Wextra -pedantic)
 target_compile_options(calibrate_extrinsics PUBLIC -Wall -Wextra -pedantic)
-target_compile_options(chessboard_test PUBLIC -Wall -Wextra -pedantic)
+# target_compile_options(chessboard_test PUBLIC -Wall -Wextra -pedantic)
 
 target_compile_features(comparator PUBLIC cxx_std_20)
 target_compile_features(calibrate_extrinsics PUBLIC cxx_std_20)
-target_compile_features(chessboard_test PUBLIC cxx_std_20)
+# target_compile_features(chessboard_test PUBLIC cxx_std_20)
 
 
 # install the include files by copying the whole include directory

@@ -152,8 +152,18 @@ class ChessBoard:
         """
 
         corner_locations = []
-        for r in range(1, self.height):
-            for c in range(1, self.width):
+
+        if self.gingham_format:
+            start = 0
+            endh = self.height + 1
+            endw = self.width + 1
+        else:
+            start = 1
+            endh = self.height
+            endw = self.width
+
+        for r in range(start, endh):
+            for c in range(start, endw):
                 cx = c * self.square_size
                 cy = r * self.square_size
 

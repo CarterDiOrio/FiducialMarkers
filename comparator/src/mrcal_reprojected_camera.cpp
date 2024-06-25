@@ -1,8 +1,12 @@
 #include "comparator/mrcal_reprojected_camera.hpp"
 #include <algorithm>
 #include <memory>
-#include <mrcal/basic_geometry.h>
-#include <mrcal/mrcal.h>
+
+extern "C" {
+  #include <mrcal/basic-geometry.h>
+  #include <mrcal/mrcal.h>
+}
+
 #include <opencv2/imgproc.hpp>
 
 std::unique_ptr<MrCalReprojectedCamera> MrCalReprojectedCamera::from_files(
@@ -54,6 +58,7 @@ cv::Mat MrCalReprojectedCamera::get_frame() const
 
 cv::Mat MrCalReprojectedCamera::get_intrinsics() const
 {
+  //TODO
   return cv::Mat();
 }
 

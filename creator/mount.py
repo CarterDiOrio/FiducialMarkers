@@ -1,5 +1,5 @@
 import numpy as np
-
+import json
 from tags import *
 
 
@@ -7,19 +7,20 @@ def write_mount_configuration(filename: str, T_mp: np.ndarray, fiducial):
 
     file_text = ""
 
-    # write T_mp row by row as csv on single line
-    for row in T_mp:
-        file_text += ",".join([str(x) for x in row]) + ","
+    mount_def = {}
+    mount_def["Type"] = "ChessBoard"
+    mount_def["T_mf"] = T_mp.tolist()
+    mount_def["Height"] = fiducial.height
+    mount_def["Width"] = fiducial.width
+    mount_def["SquareSize"] = fiducial.square_size
 
-    file_text += "\n"
+    corners = []
+    for corner in fiducial.get_corner_locations(centered=True):
+        corners.append([corner[0], corner[1]])
 
-    if isinstance(fiducial, ChessBoard):
-        file_text += "ChessBoard\n"
-        file_text += f"{fiducial.height-1},{fiducial.width-1},{fiducial.square_size}\n"
+    print(len(corners))
 
-        for corner in fiducial.get_corner_locations(centered=True):
-            file_text += ",".join([str(x) for x in corner])
-            file_text += "\n"
+    mount_def["Corners"] = corners
 
     with open(filename, "w") as f:
-        f.write(file_text)
+        json.dump(mount_def, f, indent=4)

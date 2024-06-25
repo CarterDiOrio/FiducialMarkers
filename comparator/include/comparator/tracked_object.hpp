@@ -6,7 +6,7 @@
 #include <opencv2/core.hpp>
 #include <optional>
 #include "DataStreamClient.h"
-
+#include <sophus/se3.hpp>
 
 namespace vicon
 {
@@ -21,7 +21,7 @@ struct TrackedObject
 /// \param obj The object to get the pose of
 /// \param client The vicon client
 /// \return The pose of the object
-std::optional<Eigen::Matrix4d> get_object_transform(
+std::optional<Sophus::SE3d> get_object_transform(
   const TrackedObject & obj,
   const ViconDataStreamSDK::CPP::Client & client);
 

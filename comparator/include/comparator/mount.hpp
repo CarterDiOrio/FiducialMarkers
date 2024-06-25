@@ -1,7 +1,6 @@
 #ifndef INC_GUARD_MOUNT_HPP
 #define INC_GUARD_MOUNT_HPP
 
-#include <string>
 #include <opencv2/core.hpp>
 #include <Eigen/Dense>
 
@@ -20,16 +19,22 @@ struct Mount
   /// \brief The type of fiducial
   FiducialType fiducial_id;
 
-  /// \brief The parameters of the fiducial
-  std::string fiducial_parameters;
-
-  /// \brief The corners of the fiducial
+  /// \brief The corners of the fiducial in the fiducials frame
   std::vector<Eigen::Vector3d> fiducial_corners;
 };
 
-/// \brief Loads a mount from a file
-/// \param file_path The path to the file to load the mount from
-/// \return The mount
-Mount load_mount(const std::string & file_path);
+
+/// \brief Creates a chessboard mount
+/// \param T_mp The transformation from the fiducial to the mount (or an guess)
+/// \param n_corners The number of corners in the chessboard
+/// \param corner_spacing The spacing between the corners in meters
+/// \return The created mount
+Mount create_chessboard(
+  const Eigen::Matrix4d & T_mp,
+  size_t n_corners_x,
+  size_t n_corners_y,
+  double corner_spacing
+);
+
 
 #endif

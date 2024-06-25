@@ -1,9 +1,10 @@
 #include "comparator/tracked_object.hpp"
+#include <sophus/se3.hpp>
 
 namespace vicon
 {
 
-std::optional<Eigen::Matrix4d> get_object_transform(
+std::optional<Sophus::SE3d> get_object_transform(
   const TrackedObject & obj,
   const ViconDataStreamSDK::CPP::Client & client)
 {
@@ -11,7 +12,9 @@ std::optional<Eigen::Matrix4d> get_object_transform(
     obj.subject_name,
     obj.root_segment_name);
 
-  if (segment_global_translation.Result != ViconDataStreamSDK::CPP::Result::Success) {
+  if (segment_global_translation.Result !=
+    ViconDataStreamSDK::CPP::Result::Success)
+  {
     return {};
   }
 
@@ -19,7 +22,9 @@ std::optional<Eigen::Matrix4d> get_object_transform(
     obj.subject_name,
     obj.root_segment_name);
 
-  if (segment_global_rotation.Result != ViconDataStreamSDK::CPP::Result::Success) {
+  if (segment_global_rotation.Result !=
+    ViconDataStreamSDK::CPP::Result::Success)
+  {
     return {};
   }
 
@@ -30,7 +35,7 @@ std::optional<Eigen::Matrix4d> get_object_transform(
   pose.block<3, 1>(0, 3) = Eigen::Map<Eigen::Vector3d>(
     segment_global_translation.Translation);
 
-  return pose;
+  return Sophus::SE3d{pose};
 }
 
 
