@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <nlohmann/adl_serializer.hpp>
 #include <nlohmann/json.hpp>
+#include <iostream>
 
 namespace nlohmann
 {
@@ -20,7 +21,12 @@ struct adl_serializer<Eigen::Matrix<T, S, S2>>
   static void from_json(const json & j, Eigen::Matrix<T, S, S2> & p)
   {
     std::vector<T> data = j.get<std::vector<T>>();
-    p = Eigen::Map<Eigen::Matrix<T, S, S2>>(data.data());
+
+    for (int c = 0; c < S2; c++) {
+      for (int r = 0; r < S; r++) {
+        p(r, c) = data[r + c * S2];
+      }
+    }
   }
 };
 

@@ -1,6 +1,7 @@
 #include "comparator/extrinsic_observation.hpp"
 #include <nlohmann/json.hpp>
 #include "comparator/eigen_json.hpp"
+#include <iostream>
 
 void to_json(json & j, const ExtrinsicObservation & value)
 {

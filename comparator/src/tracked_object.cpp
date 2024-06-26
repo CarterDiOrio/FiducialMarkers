@@ -1,5 +1,6 @@
 #include "comparator/tracked_object.hpp"
 #include <sophus/se3.hpp>
+#include <iostream>
 
 namespace vicon
 {
@@ -28,7 +29,11 @@ std::optional<Sophus::SE3d> get_object_transform(
     return {};
   }
 
-  Eigen::Map<Eigen::Matrix3d> rotation(segment_global_rotation.Rotation);
+  // Eigen::Map<Eigen::Matrix3d> rotation(segment_global_rotation.Rotation);
+
+  // map rotation array to rotation matrix
+  Eigen::Matrix3d rotation = Eigen::Map<Eigen::Matrix<double, 3, 3>>(
+    segment_global_rotation.Rotation);
 
   Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
   pose.block<3, 3>(0, 0) = rotation.transpose();

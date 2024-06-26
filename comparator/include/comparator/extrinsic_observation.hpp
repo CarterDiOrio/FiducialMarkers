@@ -15,12 +15,20 @@ struct ExtrinsicObservation
 
   /// \brief the observation of the fiducial's points in the image
   std::vector<Eigen::Vector2d> image_points;
+
+  ExtrinsicObservation() = default;
+
+  ExtrinsicObservation(
+    const Eigen::Matrix4d & T_world_mount,
+    const std::vector<Eigen::Vector2d> & image_points
+  )
+  : T_world_mount(T_world_mount), image_points(image_points) {}
 };
 
 struct ExtrinsicObservations
 {
   /// \brief contains all the individual observations
-  std::vector<ExtrinsicObservations> observations;
+  std::vector<ExtrinsicObservation> observations;
 };
 
 

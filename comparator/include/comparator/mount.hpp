@@ -23,7 +23,6 @@ struct Mount
   std::vector<Eigen::Vector3d> fiducial_corners;
 };
 
-
 /// \brief Creates a chessboard mount
 /// \param T_mp The transformation from the fiducial to the mount (or an guess)
 /// \param n_corners The number of corners in the chessboard
@@ -36,5 +35,9 @@ Mount create_chessboard(
   double corner_spacing
 );
 
+
+std::vector<Eigen::Vector3d> operator*(
+  const Eigen::Matrix4d & T,
+  const std::vector<Eigen::Vector3d> & points);
 
 #endif

@@ -19,6 +19,8 @@ find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(Sophus REQUIRED)
 find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
 
 # find and import mrcal
 add_library(mrcal SHARED IMPORTED)
@@ -27,7 +29,13 @@ set_target_properties(mrcal PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "/usr/include/mrcal/"
 )
 
-include_directories( ${OpenCV_INCLUDE_DIRS} )
+#find and import mrgingham
+add_library(mrgingham SHARED IMPORTED)
+set_target_properties(mrgingham PROPERTIES
+  IMPORTED_LOCATION "/usr/lib/x86_64-linux-gnu/libmrgingham.so"
+  INTERFACE_INCLUDE_DIRECTORIES "/usr/include/mrgingham/"
+)
+
 
 # add vicon library
 add_library(datastream SHARED IMPORTED)
@@ -52,7 +60,8 @@ add_library(comparator
               src/extrinsic_observation.cpp
               src/mrcal_reprojected_camera.cpp
               src/mount.cpp
-              src/chessboard.cpp)
+              src/chessboard.cpp
+              src/extrinsic_calibration.cpp)
 
 
 add_executable(calibrate_extrinsics src/calibrate_extrinsics.cpp)
@@ -71,7 +80,9 @@ target_link_libraries(comparator datastream
                                  ${OpenCV_LIBS} 
                                  Boost::program_options
                                  Sophus::Sophus
-                                 mrcal)
+                                 mrcal
+                                 mrgingham
+                                 Ceres::ceres)
 target_link_libraries(calibrate_extrinsics comparator)
 # target_link_libraries(chessboard_test Eigen3::Eigen ${OpenCV_LIBS} realsense2)
 

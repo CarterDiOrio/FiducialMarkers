@@ -1,4 +1,5 @@
 #include "comparator/mount.hpp"
+#include <vector>
 
 
 Mount create_chessboard(
@@ -26,4 +27,17 @@ Mount create_chessboard(
     FiducialType::ChessBoard,
     corners
   };
+}
+
+std::vector<Eigen::Vector3d> operator*(
+  const Eigen::Matrix4d & T,
+  const std::vector<Eigen::Vector3d> & points)
+{
+  std::vector<Eigen::Vector3d> transformed_points;
+  for (const Eigen::Vector3d & point: points) {
+    transformed_points.push_back(
+      (T * point.homogeneous()).head<3>()
+    );
+  }
+  return transformed_points;
 }
