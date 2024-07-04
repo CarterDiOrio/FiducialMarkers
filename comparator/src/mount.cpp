@@ -1,6 +1,6 @@
 #include "comparator/mount.hpp"
 #include <vector>
-
+#include <iostream>
 
 Mount create_chessboard(
   const Eigen::Matrix4d & T_mp,

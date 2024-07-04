@@ -7,14 +7,41 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 #include <opencv2/highgui.hpp>
+#include <nlohmann/json.hpp>
+#include "comparator/eigen_json.hpp"
 
-std::optional<std::vector<Eigen::Vector2d>> mrgingham_find_chessboard(
+void to_json(nlohmann::json & j, const CornerObservation & obs)
+{
+  j = nlohmann::json{
+    {"img_point", obs.img_point},
+    {"level", obs.level}
+  };
+}
+
+void from_json(const nlohmann::json & j, CornerObservation & obs)
+{
+  j.at("img_point").get_to(obs.img_point);
+  j.at("level").get_to(obs.level);
+}
+
+void to_json(nlohmann::json & j, const ChessboardObservation & obs)
+{
+  j = nlohmann::json{
+    {"corners", obs.corners}
+  };
+}
+
+void from_json(const nlohmann::json & j, ChessboardObservation & obs)
+{
+  j.at("corners").get_to(obs.corners);
+}
+
+std::optional<ChessboardObservation> mrgingham_find_chessboard(
   const cv::Mat & img,
   int gridn,
   bool refine_corners
 )
 {
-
   cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
   clahe->setClipLimit(4);
 
@@ -56,15 +83,20 @@ std::optional<std::vector<Eigen::Vector2d>> mrgingham_find_chessboard(
     return std::nullopt;
   }
 
+  // convert mrgingham points to eigen vectors
+  ChessboardObservation chessboard_observation{};
+  for (size_t i = 0; i < points_out.size(); i++) {
+    chessboard_observation.corners.push_back(
+    {
+      Eigen::Vector2d(points_out[i].x, points_out[i].y),
+      ((refinement_level ==
+      NULL) ? found_pyramid_level : (int)refinement_level[i])
+    });
+  }
+
   // making sure to free the refinement buffer
   // mrgingham internally allocates this buffer
   free(refinement_level);
 
-  // convert mrgingham points to eigen vectors
-  std::vector<Eigen::Vector2d> corners;
-  for (const auto & point : points_out) {
-    corners.push_back(Eigen::Vector2d(point.x, point.y));
-  }
-
-  return corners;
+  return chessboard_observation;
 }

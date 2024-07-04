@@ -4,6 +4,7 @@
 #include <ceres/problem.h>
 #include <ceres/solver.h>
 #include <ceres/types.h>
+#include <cmath>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
@@ -18,31 +19,34 @@
 namespace calibration
 {
 
-ExtrinsicCalibration calibrate_extrinsics(
+ExtrinsicCalibrationData calibrate_extrinsics(
   const ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
+  const ExtrinsicCalibration & initial_guess,
   const ExtrinsicCalibrationOptions & options
 )
 {
   // get a decent initial guess
-  Sophus::SE3d T_x_camera = seed_extrinsic_calibration(
-    observations, mount, K,
-    options);
+  // Sophus::SE3d T_x_camera = seed_extrinsic_calibration(
+  //   observations,
+  //   mount,
+  //   K,
+  //   initial_guess,
+  //   options);
 
-  // create a guess for the mount to fiducial
-  Sophus::SE3d T_mount_fiducial{mount.T_mp};
-
-  return optimize_extrinsics(
+  const auto extrinsics = optimize_extrinsics(
     observations,
     mount,
     K,
-    {T_x_camera, T_mount_fiducial},
+    initial_guess,
     options
   );
+
+  return extrinsics;
 }
 
-ExtrinsicCalibration optimize_extrinsics(
+ExtrinsicCalibrationData optimize_extrinsics(
   const ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
@@ -58,7 +62,6 @@ ExtrinsicCalibration optimize_extrinsics(
 
   // create problem
   ceres::Problem problem;
-  ceres::LossFunction * loss_function = new ceres::HuberLoss(0.1);
 
   // In this problem the only two parameters are the two defined transforms
   auto parameterization = new Sophus::Manifold<Sophus::SE3>;
@@ -76,25 +79,45 @@ ExtrinsicCalibration optimize_extrinsics(
     parameterization
   );
 
+  // set mount fiducial to be constant. TODO: make this an exposed option
+  // problem.SetParameterBlockConstant(T_mount_fiducial.data());
+  auto loss = new ceres::HuberLoss(5.0);
 
   // add each observation/fiducial corner to the problem
   std::vector<ceres::ResidualBlockId> ids; //save the ids for outlier rejection
-  for (const auto & observation: observations.observations) {
-    for (size_t i = 0; i < observation.image_points.size(); i++) {
-      const auto cost_function = ExtrinsicsCostFunction::Create(
-        observation.image_points[i],
-        mount.fiducial_corners[i],
-        observation.T_world_mount,
-        K_eig
-      ); //ceres takes ownership over this memory itself
+  for (const auto & extrinsic_observation: observations.observations) {
 
+    const auto & corner_observations =
+      extrinsic_observation.chessboard_observations.corners;
+
+    for (size_t i = 0; i < corner_observations.size(); i++) {
+      const auto & corner_observation = corner_observations[i];
+      const auto cost_function = ExtrinsicsCostFunction::Create(
+        corner_observation.img_point,
+        mount.fiducial_corners[i],
+        extrinsic_observation.T_world_mount,
+        extrinsic_observation.T_world_cmount,
+        K_eig
+      );   //ceres takes ownership over this memory itself
+
+
+      // scaling by the scale factor used to detect the corner. The higher
+      // the level on the image pyramid the smaller the corner is in the image
+      double scale_factor = 1.0 / (std::pow(2.0, corner_observation.level));
+
+      // ceres::LossFunction * scaled_loss = new ceres::ScaledLoss(
+      //   new ceres::HuberLoss(), //the scaled loss function takes ownership
+      //   scale_factor,
+      //   ceres::TAKE_OWNERSHIP
+      // ); //ceres takes ownership of this memory
 
       const auto id = problem.AddResidualBlock(
         cost_function,
-        loss_function,
+        loss,
         T_mount_fiducial.data(),
         T_x_camera.data()
       );
+
       ids.push_back(id);
     }
   }
@@ -110,12 +133,18 @@ ExtrinsicCalibration optimize_extrinsics(
   ceres::Solver::Summary summary;
   ceres::Solve(ceres_solver_options, &problem, &summary);
 
-  // TODO: ceres might take ownership of this memory, unsure
-  // free(parameterization); //make sure to free the parameterization
+
+  std::cout << summary.FullReport() << std::endl;
+
+  // calculate final residuals
+  std::vector<double> residuals;
+  problem.Evaluate(
+    ceres::Problem::EvaluateOptions{}, nullptr, &residuals,
+    nullptr, nullptr);
 
   return {
-    T_x_camera,
-    T_mount_fiducial,
+    {T_x_camera, T_mount_fiducial},
+    residuals
   };
 }
 
@@ -124,23 +153,34 @@ Sophus::SE3d seed_extrinsic_calibration(
   const ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
+  const ExtrinsicCalibration & initial_guess,
   const ExtrinsicCalibrationOptions & options)
 {
-  if (!options.camera_to_hand) {
-    // Not sure if averaging is better than throwing it all into one
-    // pnp problem... should test
-    std::vector<Sophus::SE3d> T_ws;
-    for (const auto & observation: observations.observations) {
-      const auto world_points = (observation.T_world_mount * mount.T_mp) *
-        mount.fiducial_corners;
-      T_ws.push_back(solve_pnp(world_points, observation.image_points, K));
-    }
-    return *Sophus::average(T_ws);
-  } else {
-    assert(!"Camera Hand eye calibration not implemented");
-  }
+  // Not sure if averaging is better than throwing it all into one
+  // pnp problem... should test
+  std::vector<Sophus::SE3d> T_ws;
+  for (const auto & observation: observations.observations) {
+    const auto world_points = (observation.T_world_mount * mount.T_mp) *
+      mount.fiducial_corners;
 
-  return Sophus::SE3d{};
+    std::vector<Eigen::Vector2d> image_points;
+    for (const auto & corner: observation.chessboard_observations.corners) {
+      image_points.push_back(corner.img_point);
+    }
+
+    const Sophus::SE3d T_world_camera = solve_pnp(
+      world_points, image_points,
+      K);
+
+    const Sophus::SE3d T_camera_world = T_world_camera.inverse();
+    const Sophus::SE3d T_camera_x = T_camera_world *
+      Sophus::SE3d{observation.T_world_cmount};
+    const Sophus::SE3d T_x_camera = T_camera_x.inverse();
+
+    T_ws.push_back(T_x_camera);
+  }
+  return *Sophus::average(T_ws);
+  // return Sophus::SE3d{};
 }
 
 Sophus::SE3d solve_pnp(

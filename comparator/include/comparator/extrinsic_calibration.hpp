@@ -21,18 +21,34 @@ struct ExtrinsicCalibration
 {
   Sophus::SE3d T_x_camera;
   Sophus::SE3d T_mount_fiducial;
+
+  static ExtrinsicCalibration Identity()
+  {
+    return {
+      Sophus::SE3d{Eigen::Matrix4d::Identity()},
+      Sophus::SE3d{Eigen::Matrix4d::Identity()}
+    };
+  }
+};
+
+
+struct ExtrinsicCalibrationData
+{
+  ExtrinsicCalibration calibration;
+  std::vector<double> residuals{};
 };
 
 /// \brief Calibrates the extrinsics of the system
-ExtrinsicCalibration calibrate_extrinsics(
+ExtrinsicCalibrationData calibrate_extrinsics(
   const ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
+  const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity(),
   const ExtrinsicCalibrationOptions & options = ExtrinsicCalibrationOptions{}
 );
 
 /// \brief Optimizes the extrinsics of the system
-ExtrinsicCalibration optimize_extrinsics(
+ExtrinsicCalibrationData optimize_extrinsics(
   const ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
@@ -47,11 +63,11 @@ Sophus::SE3d seed_extrinsic_calibration(
   const ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
+  const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity(),
   const ExtrinsicCalibrationOptions & options = ExtrinsicCalibrationOptions{}
 );
 
 /// \brief Performs PnP using OpenCV's solvePnP
-/// \param ExtrinsicObservation The observation to use
 /// \param K The camera matrix
 Sophus::SE3d solve_pnp(
   const std::vector<cv::Point3f> & object_points,
@@ -60,7 +76,6 @@ Sophus::SE3d solve_pnp(
 );
 
 /// \brief Performs PnP using OpenCV's solvePnP
-/// \param ExtrinsicObservation The observation to use
 /// \param K The camera matrix
 Sophus::SE3d solve_pnp(
   const std::vector<Eigen::Vector3d> & object_points,

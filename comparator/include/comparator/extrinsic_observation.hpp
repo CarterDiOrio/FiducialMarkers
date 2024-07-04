@@ -4,8 +4,10 @@
 #include <Eigen/Dense>
 #include <nlohmann/json_fwd.hpp>
 #include "comparator/mount.hpp"
+#include "comparator/chessboard.hpp"
 
 using json = nlohmann::json;
+
 
 /// \brief Struct containing a single observation under the vicon system.
 struct ExtrinsicObservation
@@ -13,16 +15,22 @@ struct ExtrinsicObservation
   /// \brief The transform from the mount to the world coordinates
   Eigen::Matrix4d T_world_mount;
 
-  /// \brief the observation of the fiducial's points in the image
-  std::vector<Eigen::Vector2d> image_points;
+  /// \brief The transform from the camera mount to the world coordinates
+  Eigen::Matrix4d T_world_cmount;
+
+  /// \brief the observation of the chessboard in the image
+  ChessboardObservation chessboard_observations;
 
   ExtrinsicObservation() = default;
 
   ExtrinsicObservation(
     const Eigen::Matrix4d & T_world_mount,
-    const std::vector<Eigen::Vector2d> & image_points
+    const Eigen::Matrix4d & T_world_cmount,
+    const ChessboardObservation & chessboard_observation
   )
-  : T_world_mount(T_world_mount), image_points(image_points) {}
+  : T_world_mount(T_world_mount),
+    T_world_cmount(T_world_cmount),
+    chessboard_observations(chessboard_observation) {}
 };
 
 struct ExtrinsicObservations
@@ -30,7 +38,6 @@ struct ExtrinsicObservations
   /// \brief contains all the individual observations
   std::vector<ExtrinsicObservation> observations;
 };
-
 
 /// \brief Converts ExtrinsicObservation to json
 /// \param j The json object to convert to
