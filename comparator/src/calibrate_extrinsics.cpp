@@ -16,6 +16,8 @@
 #include "comparator/extrinsic_observation.hpp"
 #include "comparator/chessboard.hpp"
 #include "comparator/extrinsic_calibration.hpp"
+#include "comparator/reprojection_cost_function.hpp"
+#include "comparator/hand_error_cost_function.hpp"
 #include <memory>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>

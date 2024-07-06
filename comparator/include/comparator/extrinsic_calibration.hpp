@@ -31,6 +31,18 @@ struct ExtrinsicCalibration
   }
 };
 
+struct OptimizationInputs
+{
+  /// \brief The observations for the extrinsic calibration
+  ExtrinsicObservations observations;
+
+  /// \brief the initial guess of T_hand_camera and T_mount_fiducial
+  ExtrinsicCalibration initial_guess;
+
+  /// \brief Initial transformation guesses from the calibration object to
+  /// the camera
+  std::vector<Sophus::SE3d> T_eye_objects;
+};
 
 struct ExtrinsicCalibrationData
 {
@@ -40,7 +52,7 @@ struct ExtrinsicCalibrationData
 
 /// \brief Calibrates the extrinsics of the system
 ExtrinsicCalibrationData calibrate_extrinsics(
-  const ExtrinsicObservations & observations,
+  ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
   const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity(),
@@ -49,26 +61,29 @@ ExtrinsicCalibrationData calibrate_extrinsics(
 
 /// \brief Optimizes the extrinsics of the system
 ExtrinsicCalibrationData optimize_extrinsics(
-  const ExtrinsicObservations & observations,
+  OptimizationInputs & inputs,
   const Mount & mount,
   const cv::Mat & K,
-  const ExtrinsicCalibration & initial_guess,
+  bool lock_camera,
+  bool lock_mount,
   const ExtrinsicCalibrationOptions & options = ExtrinsicCalibrationOptions{}
 );
 
 /// \brief Seeds an initial guess for the extrinsic calibration
 /// \param observations The observations to seed the calibration with
 /// \param mount The mount used in the observations
-Sophus::SE3d seed_extrinsic_calibration(
+std::vector<Sophus::SE3d> seed_extrinsic_calibration(
   const ExtrinsicObservations & observations,
+  const ExtrinsicCalibration & initial_guess,
   const Mount & mount,
-  const cv::Mat & K,
-  const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity(),
-  const ExtrinsicCalibrationOptions & options = ExtrinsicCalibrationOptions{}
+  const cv::Mat & K
 );
 
 /// \brief Performs PnP using OpenCV's solvePnP
+/// \param object_points The object points
+/// \param image_points The image points
 /// \param K The camera matrix
+/// \return The transformation from the object to the camera's frame, T_co
 Sophus::SE3d solve_pnp(
   const std::vector<cv::Point3f> & object_points,
   const std::vector<cv::Point2f> & image_points,
@@ -76,11 +91,21 @@ Sophus::SE3d solve_pnp(
 );
 
 /// \brief Performs PnP using OpenCV's solvePnP
+/// \param object_points The object points
+/// \param image_points The image points
 /// \param K The camera matrix
+/// \return The transformation from the object to the camera's frame, T_co
 Sophus::SE3d solve_pnp(
   const std::vector<Eigen::Vector3d> & object_points,
   const std::vector<Eigen::Vector2d> & image_points,
   const cv::Mat & K
+);
+
+double evaluate_observation(
+  const ExtrinsicCalibration & extrinsics,
+  const ExtrinsicObservation & observation,
+  const cv::Mat K,
+  const Mount & mount
 );
 
 }
