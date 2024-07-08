@@ -4,6 +4,8 @@
 #include "comparator/extrinsic_observation.hpp"
 #include "comparator/mount.hpp"
 #include <sophus/se3.hpp>
+#include <ceres/problem.h>
+
 
 namespace calibration
 {
@@ -21,10 +23,12 @@ struct ExtrinsicCalibration
 {
   Sophus::SE3d T_x_camera;
   Sophus::SE3d T_mount_fiducial;
+  Sophus::SE3d T_world_object;
 
   static ExtrinsicCalibration Identity()
   {
     return {
+      Sophus::SE3d{Eigen::Matrix4d::Identity()},
       Sophus::SE3d{Eigen::Matrix4d::Identity()},
       Sophus::SE3d{Eigen::Matrix4d::Identity()}
     };
@@ -55,18 +59,33 @@ ExtrinsicCalibrationData calibrate_extrinsics(
   ExtrinsicObservations & observations,
   const Mount & mount,
   const cv::Mat & K,
-  const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity(),
-  const ExtrinsicCalibrationOptions & options = ExtrinsicCalibrationOptions{}
+  const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity()
 );
 
 /// \brief Optimizes the extrinsics of the system
 ExtrinsicCalibrationData optimize_extrinsics(
   OptimizationInputs & inputs,
   const Mount & mount,
-  const cv::Mat & K,
-  bool lock_camera,
-  bool lock_mount,
-  const ExtrinsicCalibrationOptions & options = ExtrinsicCalibrationOptions{}
+  const cv::Mat & K
+);
+
+/// \brief Adds the hand-eye calibration problem to the ceres problem
+void add_hand_eye_problem(
+  ceres::Problem & problem,
+  Sophus::SE3d & T_hand_eye,
+  Sophus::SE3d & T_world_object,
+  std::vector<Sophus::SE3d> & T_eye_objects,
+  const ExtrinsicObservations & observations,
+  const Mount & mount,
+  const cv::Mat & K
+);
+
+/// \brief Adds the mount calibration problem to the ceres problem
+void add_mount_fiducial_problem(
+  ceres::Problem & problem,
+  Sophus::SE3d & T_mount_fiducial,
+  Sophus::SE3d & T_world_object,
+  const ExtrinsicObservations & observations
 );
 
 /// \brief Seeds an initial guess for the extrinsic calibration
@@ -105,6 +124,21 @@ double evaluate_observation(
   const ExtrinsicCalibration & extrinsics,
   const ExtrinsicObservation & observation,
   const cv::Mat K,
+  const Mount & mount
+);
+
+double evaluate_pnp(
+  const ExtrinsicObservation & observation,
+  const Sophus::SE3d & T_eye_object,
+  const cv::Mat & K,
+  const Mount & mount
+);
+
+double evaluate_hand_eye(
+  const ExtrinsicObservation & observation,
+  const Sophus::SE3d & T_hand_eye,
+  const Sophus::SE3d & T_world_object,
+  const cv::Mat & K,
   const Mount & mount
 );
 

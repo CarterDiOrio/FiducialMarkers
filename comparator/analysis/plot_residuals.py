@@ -38,7 +38,7 @@ def plot_residuals(residuals_file):
         combined_xy_residuals.append(residual.y_residual)
 
     #make bucket size 0.1 for residuals from -2 to 2
-    plt.hist(combined_xy_residuals, bins=1000, range=(-200, 200))
+    plt.hist(combined_xy_residuals, bins=80, range=(-4, 4))
     
     plt.xlabel('Residual in pixels (x and y are counted seperately)')
     plt.ylabel('Frequency')
