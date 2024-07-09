@@ -27,7 +27,7 @@ struct ReprojectionCostFunction
   /// \param T_eo The transformation from the object to the eye/camera
   template<typename T>
   bool operator()(
-    const T * const T_eo,
+    const T * T_eo,
     T * residuals) const
   {
     // map the input se3 manifold to a Sophus type
@@ -55,12 +55,14 @@ struct ReprojectionCostFunction
   {
     return new ceres::AutoDiffCostFunction<ReprojectionCostFunction, 2,
              Sophus::Manifold<Sophus::SE3>::num_parameters>(
-      new ReprojectionCostFunction(K, observed_point, point_object));
+      new ReprojectionCostFunction(
+        K, observed_point, point_object));
   }
 
   const Eigen::Matrix3d K;
   const Eigen::Vector2d observed_point;
   const Eigen::Vector3d point_object;
+  const Sophus::SE3d T_world_hand;
 };
 
 }

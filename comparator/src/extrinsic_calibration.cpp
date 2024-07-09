@@ -1,5 +1,4 @@
 #include "comparator/extrinsic_calibration.hpp"
-#include "comparator/extrinsic_ceres_cost_function.hpp"
 #include "comparator/mount_error_cost_function.hpp"
 #include "comparator/extrinsic_observation.hpp"
 #include "comparator/hand_error_cost_function.hpp"
@@ -18,7 +17,6 @@
 #include <sophus/average.hpp>
 #include <ceres/ceres.h>
 #include <iostream>
-#include "comparator/camera_camera_cost_function.hpp"
 
 
 namespace calibration
@@ -80,21 +78,21 @@ ExtrinsicCalibrationData calibrate_extrinsics(
 
     // remove outliers
     is_outliers = false;
-    std::vector<ExtrinsicObservation> inliers;
-    for (size_t i = 0; i < residuals.size(); i++) {
-      if (std::fabs(residuals[i] - mean) < 3 * std_dev) {
-        inliers.push_back(observations.observations[i]);
-      } else {
-        is_outliers = true;
-      }
-    }
+    // std::vector<ExtrinsicObservation> inliers;
+    // for (size_t i = 0; i < residuals.size(); i++) {
+    //   if (std::fabs(residuals[i] - mean) < 3 * std_dev) {
+    //     inliers.push_back(observations.observations[i]);
+    //   } else {
+    //     is_outliers = true;
+    //   }
+    // }
 
-    if (is_outliers) {
-      std::cout << "Found: " << observations.observations.size() -
-        inliers.size() << " outliers. " << "Reoptimizing..." << std::endl;
-    }
+    // if (is_outliers) {
+    //   std::cout << "Found: " << observations.observations.size() -
+    //     inliers.size() << " outliers. " << "Reoptimizing..." << std::endl;
+    // }
 
-    observations.observations = inliers;
+    // observations.observations = inliers;
   }
 
   std::cout << "Final Size: " << observations.observations.size() << std::endl;
@@ -114,34 +112,40 @@ ExtrinsicCalibrationData optimize_extrinsics(
   Sophus::SE3d T_hand_eye{inputs.initial_guess.T_x_camera};
   Sophus::SE3d T_mount_fiducial{inputs.initial_guess.T_mount_fiducial};
   Sophus::SE3d T_world_object{inputs.observations.observations[0].T_world_mount};
+  Sophus::SE3d T_world_eye{Eigen::Matrix4d::Identity()};
 
-  add_hand_eye_problem(
-    problem,
-    T_hand_eye,
-    T_world_object,
-    inputs.T_eye_objects,
-    inputs.observations,
-    mount,
-    K);
+  // add_hand_eye_problem(
+  //   problem,
+  //   T_hand_eye,
+  //   T_world_object,
+  //   inputs.T_eye_objects,
+  //   inputs.observations,
+  //   mount,
+  //   K);
 
-  add_mount_fiducial_problem(
-    problem,
-    T_mount_fiducial,
-    T_world_object,
-    inputs.observations);
+  // add_mount_fiducial_problem(
+  //   problem,
+  //   T_mount_fiducial,
+  //   T_world_object,
+  //   inputs.observations);
+
 
   // setup the solver
   ceres::Solver::Options ceres_solver_options;
   ceres_solver_options.sparse_linear_algebra_library_type =
     ceres::SUITE_SPARSE;
+  // ceres_solver_options.trust_region_strategy_type = ceres::DOGLEG;
+  // ceres_solver_options.dogleg_type = ceres::SUBSPACE_DOGLEG;
   ceres_solver_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
   ceres_solver_options.minimizer_progress_to_stdout = true;
   ceres_solver_options.max_num_iterations = 1000;
+  ceres_solver_options.function_tolerance = 1e-16;
+  ceres_solver_options.use_inner_iterations = true;
+  ceres_solver_options.use_nonmonotonic_steps = true;
+  ceres_solver_options.jacobi_scaling = true;
 
   ceres::Solver::Summary summary;
   ceres::Solve(ceres_solver_options, &problem, &summary);
-
-  std::cout << summary.FullReport() << std::endl;
 
   // find the average T_eye_object error
   double mean = 0;
@@ -153,28 +157,41 @@ ExtrinsicCalibrationData optimize_extrinsics(
       mount
     );
   }
-  mean /= inputs.T_eye_objects.size();
-  std::cout << "Mean Chessboard to Camera Reprojection Error: " << mean <<
-    std::endl;
 
-  // find average hand eye error
-  mean = 0;
-  for (size_t i = 0; i < inputs.T_eye_objects.size(); i++) {
-    double v = evaluate_hand_eye(
-      inputs.observations.observations[i],
-      T_hand_eye,
-      T_world_object,
-      K,
-      mount
-    );
-    mean += v;
-    std::cout << v << std::endl;
-  }
-  mean /= inputs.T_eye_objects.size();
-  std::cout << "Mean Hand Eye Reprojection Error: " << mean << std::endl;
+  // mean /= inputs.T_eye_objects.size();
+  // std::cout << "Mean Chessboard to Camera Reprojection Error: " << mean <<
+  //   std::endl;
 
-  // // solve
-  // ceres::Solve(ceres_solver_options, &problem, &summary);
+  // // find average hand eye error
+  // mean = 0;
+  // for (size_t i = 0; i < inputs.T_eye_objects.size(); i++) {
+  //   double v = evaluate_hand_eye(
+  //     inputs.observations.observations[i],
+  //     T_hand_eye,
+  //     T_world_object,
+  //     K,
+  //     mount
+  //   );
+  //   mean += v;
+  // }
+  // mean /= inputs.T_eye_objects.size();
+  // std::cout << "Mean Hand Eye Reprojection Error: " << mean << std::endl;
+
+
+  // calculate T_world_object using each individual observation
+  // for (size_t i = 0; i < inputs.observations.observations.size(); i++) {
+  //   const Sophus::SE3d T_eye_object = inputs.T_eye_objects[i];
+  //   const ExtrinsicObservation & observation =
+  //     inputs.observations.observations[i];
+
+  //   const Sophus::SE3d T_world_object_guess =
+  //     Sophus::SE3d{observation.T_world_cmount} *
+  //   T_hand_eye * T_eye_object;
+
+  //   const Sophus::SE3d err = T_world_object_guess.inverse() * T_world_object;
+  //   std::cout << "Guess: " << err.translation().transpose() <<
+  //     std::endl;
+  // }
 
   std::cout << T_world_object.matrix() << std::endl;
 
@@ -218,7 +235,8 @@ void add_hand_eye_problem(
     parameterization
   );
 
-  auto loss = new ceres::HuberLoss(0.5);
+  auto loss = new ceres::HuberLoss(0.25);
+  auto loss2 = new ceres::HuberLoss(0.1);
 
   // Add each reprojection error cost
   for (size_t obs_idx = 0; obs_idx < observations.observations.size();
@@ -241,12 +259,13 @@ void add_hand_eye_problem(
         loss,
         T_eye_objects.at(obs_idx).data()
       );
+
     }
 
     // add hand eye cost
     problem.AddResidualBlock(
       HandErrorCostFunction::Create(Sophus::SE3d{observation.T_world_cmount}),
-      loss,
+      loss2,
       T_eye_objects.at(obs_idx).data(),
       T_hand_eye.data(),
       T_world_object.data()
@@ -268,10 +287,12 @@ void add_mount_fiducial_problem(
     parameterization
   );
 
+  auto loss2 = new ceres::HuberLoss(0.1);
+
   for (const auto & observation: observations.observations) {
     problem.AddResidualBlock(
       MountErrorCostFunction::Create(Sophus::SE3d{observation.T_world_mount}),
-      nullptr,
+      loss2,
       T_world_object.data(),
       T_mount_fiducial.data()
     );

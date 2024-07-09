@@ -42,6 +42,8 @@ namespace po = boost::program_options;
 ExtrinsicObservations gather_vicon_measurements(
   const CameraIntf & camera);
 
+void measure_vicon_variance();
+
 int main(int argc, char ** argv)
 {
   po::options_description desc("Allowed options");
@@ -56,6 +58,10 @@ int main(int argc, char ** argv)
     "pinhole_model",
     po::value<std::string>()->default_value(""),
     "The path to the pinhole model file from mrcal"
+  )(
+    "vicon_variance",
+    po::value<std::string>()->default_value("n")->implicit_value("y"),
+    "Measure the variance of the vicon system"
   );
 
   po::variables_map vm;
@@ -70,6 +76,11 @@ int main(int argc, char ** argv)
   if (vm.count("help")) {
     std::cout << desc << std::endl;
     return 1;
+  }
+
+  if (vm["vicon_variance"].as<std::string>() == "y") {
+    measure_vicon_variance();
+    return 0;
   }
 
   const std::string measurements_file = vm["measurements"].as<std::string>();
@@ -127,12 +138,19 @@ int main(int argc, char ** argv)
 
   Eigen::Matrix4d T_cmount_camera;
   T_cmount_camera << 1, 0, 0, 0,
+    0, 1, 0, 0,
     0, 0, 1, 0,
-    0, -1, 0, 0,
+    0, 0, 0, 1;
+
+  Eigen::Matrix4d T_mount_fiducial;
+  T_mount_fiducial << 1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, -8,
     0, 0, 0, 1;
 
   auto initial_guess = calibration::ExtrinsicCalibration::Identity();
   initial_guess.T_x_camera = Sophus::SE3d{T_cmount_camera};
+  initial_guess.T_mount_fiducial = Sophus::SE3d{T_mount_fiducial};
 
 
   // calibrate the extrinsics
@@ -259,9 +277,13 @@ ExtrinsicObservations gather_vicon_measurements(
       // is small.
       std::vector<Sophus::SE3d> mount_measurements;
       std::vector<Sophus::SE3d> camera_measurements;
-      while (mount_measurements.size() < 100 ||
-        camera_measurements.size() < 100)
+      while (mount_measurements.size() < 1500 ||
+        camera_measurements.size() < 1500)
       {
+        if (mount_measurements.size() % 100 == 0) {
+          std::cout << "Iteration: " << mount_measurements.size() << std::endl;
+        }
+
         auto success = client->GetFrame();       //Pull vicon data
         std::optional<Sophus::SE3d> maybe_T_wm =
           get_object_transform(fiducial_mount_vicon, *client);
@@ -285,12 +307,18 @@ ExtrinsicObservations gather_vicon_measurements(
         camera_measurements.push_back(T_wc);
       }
 
-
       Sophus::SE3d T_wm_avg = *Sophus::average(mount_measurements);
       Sophus::SE3d T_wc_avg = *Sophus::average(camera_measurements);
 
-      std::cout << "T_wm_avg: \n" << T_wm_avg.matrix() << std::endl;
-      std::cout << "T_wc_avg: \n" << T_wc_avg.matrix() << std::endl;
+      std::cout << "T_wm_translation: " << T_wm_avg.translation().transpose() <<
+        " T_wm_rotation: " << T_wm_avg.so3().angleX() << " " <<
+        T_wm_avg.so3().angleY() << " " << T_wm_avg.so3().angleZ() << std::endl;
+
+      std::cout << "T_wc_translation: " << T_wc_avg.translation().transpose() <<
+        " T_wc_rotation: " << T_wc_avg.so3().angleX() << " " <<
+        T_wc_avg.so3().angleY() << " " << T_wc_avg.so3().angleZ() << std::endl;
+
+      std::cout << std::endl;
 
 
       observations.observations.emplace_back(
@@ -299,10 +327,84 @@ ExtrinsicObservations gather_vicon_measurements(
         *maybe_observation
       );
     }
-    cv::imshow("frame", img);
-    // cv::imshow("uncorrected", uimg);
+    cv::imshow("frame ", img);
+    // cv::imshow("uncorrected ", uimg);
 
   }
 
   return observations;
+}
+
+
+void measure_vicon_variance()
+{
+  std::cout << "Connecting to the vicon server..." << std::endl;
+  const auto & client = []()
+    {
+      std::string server{"169.254.100.131:801"};
+      auto client = vicon::connect_to_server(server);
+      client | vicon::EnableMarkerData | vicon::EnableSegmentData;
+      client->SetStreamMode(datastream::StreamMode::ClientPull);
+      client->GetFrame();
+      return client;
+    }();
+  std::cout << "Connected to the vicon server" << std::endl;
+
+  const auto fiducial_mount_vicon = vicon::TrackedObject{
+    .subject_name = "FiducialMount",
+    .root_segment_name = "FiducialMount"
+  };
+
+  const auto camera_mount = vicon::TrackedObject{
+    .subject_name = "realsense",
+    .root_segment_name = "realsense"
+  };
+
+  std::vector<Sophus::SE3d> mount_measurements;
+  std::vector<Sophus::SE3d> camera_measurements;
+
+
+  for (size_t i = 0; i < 10000; i++) {
+    if (i % 100 == 0) {
+      std::cout << "Iteration: " << i << std::endl;
+    }
+
+    auto success = client->GetFrame();       //Pull vicon data
+
+    std::optional<Sophus::SE3d> maybe_T_wm =
+      get_object_transform(fiducial_mount_vicon, *client);
+
+    if (!maybe_T_wm.has_value()) {
+      std::cout << "No measurement available" << std::endl;
+      continue;
+    }
+
+    Sophus::SE3d T_wm = *maybe_T_wm;
+    mount_measurements.push_back(T_wm);
+
+    std::optional<Sophus::SE3d> maybe_T_wc =
+      get_object_transform(camera_mount, *client);
+
+    if (!maybe_T_wc.has_value()) {
+      std::cout << "No measurement available" << std::endl;
+      continue;
+    }
+
+    Sophus::SE3d T_wc = *maybe_T_wc;
+    camera_measurements.push_back(T_wc);
+  }
+
+  // write mount measurements to a file
+  std::ofstream mount_file("mount_measurements.txt");
+  for (const auto & m : mount_measurements) {
+    mount_file << m.translation().transpose() << " " << m.so3().angleX() << " "
+               << m.so3().angleY() << " " << m.so3().angleZ() << std::endl;
+  }
+
+  // write camera measurements to a file
+  std::ofstream camera_file("camera_measurements.txt");
+  for (const auto & m : camera_measurements) {
+    camera_file << m.translation().transpose() << " " << m.so3().angleX() << " "
+                << m.so3().angleY() << " " << m.so3().angleZ() << std::endl;
+  }
 }

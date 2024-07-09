@@ -6,6 +6,7 @@
 #include <ceres/cost_function.h>
 #include <sophus/ceres_manifold.hpp>
 #include <sophus/se3.hpp>
+#include <ceres/jet.h>
 
 
 namespace calibration
@@ -36,8 +37,10 @@ struct HandErrorCostFunction
     SE3 T_world_object = Eigen::Map<SE3 const>{T_world_object_param};
 
     // calculate the pose graph error for the hand
-    const SE3 err = T_hand_eye *
-      (T_eye_object * T_world_object.inverse() * T_world_hand_m);
+    SE3 T_world_eye = T_world_hand_m * T_hand_eye;
+
+    const SE3 err = T_eye_object.inverse() *
+      (T_world_eye.inverse() * T_world_object);
 
     //map the residuals
     Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals{residuals_ptr};
