@@ -30,12 +30,19 @@ def plot_residuals(residuals_file):
 
             residual = Residuals(x, y, x_residual, y_residual)
             residuals.append(residual)
-        
+
     
     combined_xy_residuals = []
+    residual_norms = []
     for residual in residuals:
         combined_xy_residuals.append(residual.x_residual)
         combined_xy_residuals.append(residual.y_residual)
+        
+        residual_norms.append(np.sqrt(residual.x_residual**2 + residual.y_residual**2))
+
+    print('Mean residual norm:', np.mean(residual_norms))
+    print('Std dev: ', np.std(residual_norms))
+    
 
     #make bucket size 0.1 for residuals from -2 to 2
     plt.hist(combined_xy_residuals, bins=80, range=(-4, 4))

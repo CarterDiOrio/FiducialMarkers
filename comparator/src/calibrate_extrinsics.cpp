@@ -49,7 +49,7 @@ int main(int argc, char ** argv)
   po::options_description desc("Allowed options");
   desc.add_options()("help", "produce help message")(
     "measurements",
-    po::value<std::string>()->default_value("")->implicit_value(""),
+    po::value<std::vector<std::string>>()->multitoken(),
     "Load measurements from a file to calculate extrinsics")(
     "spline_model",
     po::value<std::string>()->default_value(""),
@@ -83,7 +83,8 @@ int main(int argc, char ** argv)
     return 0;
   }
 
-  const std::string measurements_file = vm["measurements"].as<std::string>();
+  const auto measurements_files =
+    vm["measurements"].as<std::vector<std::string>>();
 
   Eigen::Matrix4d fiducial_initial_guess = Eigen::Matrix4d::Identity();
 
@@ -94,13 +95,23 @@ int main(int argc, char ** argv)
     15);
 
   ExtrinsicObservations measurements =
-    [&vm, &measurements_file]() {
-      if (!measurements_file.empty()) {
+    [&vm, &measurements_files]() {
+      if (!measurements_files.empty()) {
         std::cout << "Loading measurements from file" << std::endl;
-        std::ifstream file(measurements_file);
-        json j;
-        file >> j;
-        return j.get<ExtrinsicObservations>();
+
+        ExtrinsicObservations total;
+        for (const auto & measurements_file : measurements_files) {
+          std::cout << "Loading: " << measurements_file << std::endl;
+          std::ifstream file(measurements_file);
+          json j;
+          file >> j;
+          auto observations = j.get<ExtrinsicObservations>();
+          total.observations.insert(
+            total.observations.end(),
+            observations.observations.begin(),
+            observations.observations.end());
+        }
+        return total;
       } else {
 
         // create a MrCal based camera from the realsense
@@ -123,7 +134,7 @@ int main(int argc, char ** argv)
     measurements.observations.size() << std::endl;
 
   // write the measurements to a file
-  if (measurements_file.empty()) {
+  if (measurements_files.empty()) {
     std::ofstream file("measurements.json");
     json j = measurements;
     file << std::setw(1) << j << std::endl;
@@ -149,7 +160,7 @@ int main(int argc, char ** argv)
     0, 0, 0, 1;
 
   auto initial_guess = calibration::ExtrinsicCalibration::Identity();
-  initial_guess.T_x_camera = Sophus::SE3d{T_cmount_camera};
+  initial_guess.T_hand_eye = Sophus::SE3d{T_cmount_camera};
   initial_guess.T_mount_fiducial = Sophus::SE3d{T_mount_fiducial};
 
 
@@ -162,7 +173,7 @@ int main(int argc, char ** argv)
 
   const auto extrinsics = extrinsics_data.calibration;
 
-  std::cout << "T_x_camera: \n" << extrinsics.T_x_camera.matrix() << std::endl;
+  std::cout << "T_x_camera: \n" << extrinsics.T_hand_eye.matrix() << std::endl;
   std::cout << "T_mount_fiducial: \n" << extrinsics.T_mount_fiducial.matrix() <<
     std::endl;
 
@@ -178,7 +189,7 @@ int main(int argc, char ** argv)
       Eigen::Vector4d p = observation.T_world_mount *
         extrinsics.T_mount_fiducial.matrix() * corner.homogeneous();
       Eigen::Vector3d p_camera =
-        (extrinsics.T_x_camera.inverse().matrix() *
+        (extrinsics.T_hand_eye.inverse().matrix() *
         observation.T_world_cmount.inverse() * p).head<3>();
       Eigen::Vector2d p_image{
         (p_camera.x() / p_camera.z()) * K.at<double>(0, 0) + K.at<double>(0, 2),
@@ -206,6 +217,12 @@ int main(int argc, char ** argv)
   }
   residuals_file.close();
 
+  // write the extrinsics to a file
+  using namespace calibration;
+  std::ofstream extrinsics_file("extrinsics.json");
+  json j = extrinsics;
+  extrinsics_file << std::setw(1) << j << std::endl;
+  extrinsics_file.close();
 
   return 0;
 }
@@ -277,8 +294,8 @@ ExtrinsicObservations gather_vicon_measurements(
       // is small.
       std::vector<Sophus::SE3d> mount_measurements;
       std::vector<Sophus::SE3d> camera_measurements;
-      while (mount_measurements.size() < 1500 ||
-        camera_measurements.size() < 1500)
+      while (mount_measurements.size() < 100 ||
+        camera_measurements.size() < 100)
       {
         if (mount_measurements.size() % 100 == 0) {
           std::cout << "Iteration: " << mount_measurements.size() << std::endl;

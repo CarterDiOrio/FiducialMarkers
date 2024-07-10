@@ -58,6 +58,51 @@ struct MountErrorCostFunction
   const Sophus::SE3d T_world_mount_m;
 };
 
+struct HandErrorCostFunction2
+{
+  HandErrorCostFunction2(
+    const Sophus::SE3d & T_world_hand_m
+  )
+  : T_world_hand_m{T_world_hand_m}
+  {
+  }
+
+  template<typename T>
+  bool operator()(
+    const T * T_world_eye_param,
+    const T * T_hand_eye_param,
+    T * residuals_ptr
+  ) const
+  {
+    using SE3 = Sophus::SE3<T>;
+
+    // map the input parameters to Sophus types
+    SE3 T_world_eye = Eigen::Map<SE3 const>{T_world_eye_param};
+    SE3 T_hand_eye = Eigen::Map<SE3 const>{T_hand_eye_param};
+
+    // calculate the pose graph error for the eye
+    const SE3 T_world_hand_est = T_world_eye * T_hand_eye.inverse();
+    const SE3 err = T_world_hand_m.inverse() * T_world_hand_est;
+
+    // map the residuals
+    Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals{residuals_ptr};
+    residuals = err.log();
+
+    return true;
+  }
+
+  static ceres::CostFunction * Create(
+    const Sophus::SE3d & T_world_hand_m)
+  {
+    return new ceres::AutoDiffCostFunction<HandErrorCostFunction2, 6,
+             Sophus::SE3d::num_parameters,
+             Sophus::SE3d::num_parameters>(
+      new HandErrorCostFunction2(T_world_hand_m));
+  }
+
+  const Sophus::SE3d T_world_hand_m;
+};
+
 }
 
 #endif

@@ -3,37 +3,31 @@
 
 #include "comparator/extrinsic_observation.hpp"
 #include "comparator/mount.hpp"
+#include "comparator/eigen_json.hpp"
 #include <sophus/se3.hpp>
 #include <ceres/problem.h>
+#include <nlohmann/json_fwd.hpp>
 
 
 namespace calibration
 {
 
-struct ExtrinsicCalibrationOptions
-{
-  /// \brief If true the extrinsic calibration performs a camera to hand
-  /// and not camera to world calibration.
-  /// This is useful when the camera is mounted to an object that provides a
-  /// transformation to the world. I.E. robot arm, tracking mount
-  bool camera_to_hand {false};
-};
-
 struct ExtrinsicCalibration
 {
-  Sophus::SE3d T_x_camera;
+  Sophus::SE3d T_hand_eye;
   Sophus::SE3d T_mount_fiducial;
-  Sophus::SE3d T_world_object;
 
   static ExtrinsicCalibration Identity()
   {
     return {
       Sophus::SE3d{Eigen::Matrix4d::Identity()},
       Sophus::SE3d{Eigen::Matrix4d::Identity()},
-      Sophus::SE3d{Eigen::Matrix4d::Identity()}
     };
   }
 };
+void to_json(json & j, const ExtrinsicCalibration & cal);
+void from_json(const json & j, ExtrinsicCalibration & cal);
+
 
 struct OptimizationInputs
 {

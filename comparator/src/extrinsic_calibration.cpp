@@ -17,7 +17,10 @@
 #include <sophus/average.hpp>
 #include <ceres/ceres.h>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
+
+using json = nlohmann::json;
 
 namespace calibration
 {
@@ -78,21 +81,21 @@ ExtrinsicCalibrationData calibrate_extrinsics(
 
     // remove outliers
     is_outliers = false;
-    // std::vector<ExtrinsicObservation> inliers;
-    // for (size_t i = 0; i < residuals.size(); i++) {
-    //   if (std::fabs(residuals[i] - mean) < 3 * std_dev) {
-    //     inliers.push_back(observations.observations[i]);
-    //   } else {
-    //     is_outliers = true;
-    //   }
-    // }
+    std::vector<ExtrinsicObservation> inliers;
+    for (size_t i = 0; i < residuals.size(); i++) {
+      if (std::fabs(residuals[i] - mean) < 3 * std_dev) {
+        inliers.push_back(observations.observations[i]);
+      } else {
+        is_outliers = true;
+      }
+    }
 
-    // if (is_outliers) {
-    //   std::cout << "Found: " << observations.observations.size() -
-    //     inliers.size() << " outliers. " << "Reoptimizing..." << std::endl;
-    // }
+    if (is_outliers) {
+      std::cout << "Found: " << observations.observations.size() -
+        inliers.size() << " outliers. " << "Reoptimizing..." << std::endl;
+    }
 
-    // observations.observations = inliers;
+    observations.observations = inliers;
   }
 
   std::cout << "Final Size: " << observations.observations.size() << std::endl;
@@ -109,33 +112,95 @@ ExtrinsicCalibrationData optimize_extrinsics(
   // create problem
   ceres::Problem problem;
 
-  Sophus::SE3d T_hand_eye{inputs.initial_guess.T_x_camera};
+  Sophus::SE3d T_hand_eye{inputs.initial_guess.T_hand_eye};
   Sophus::SE3d T_mount_fiducial{inputs.initial_guess.T_mount_fiducial};
-  Sophus::SE3d T_world_object{inputs.observations.observations[0].T_world_mount};
   Sophus::SE3d T_world_eye{Eigen::Matrix4d::Identity()};
 
-  // add_hand_eye_problem(
-  //   problem,
-  //   T_hand_eye,
-  //   T_world_object,
-  //   inputs.T_eye_objects,
-  //   inputs.observations,
-  //   mount,
-  //   K);
+  auto & observations = inputs.observations;
+  auto & T_eye_objects = inputs.T_eye_objects;
 
-  // add_mount_fiducial_problem(
-  //   problem,
-  //   T_mount_fiducial,
-  //   T_world_object,
-  //   inputs.observations);
+  Eigen::Matrix3d K_eig;
+  cv::cv2eigen(K, K_eig);
+  auto parameterization = new Sophus::Manifold<Sophus::SE3>;
+
+  // Add T_mount_fiducial parameter
+  problem.AddParameterBlock(
+    T_mount_fiducial.data(),
+    Sophus::SE3d::num_parameters,
+    parameterization
+  );
+
+  // Add T_world_eye parameter
+  problem.AddParameterBlock(
+    T_world_eye.data(),
+    Sophus::SE3d::num_parameters,
+    parameterization
+  );
+
+  // Add T_hand_eye parameter
+  problem.AddParameterBlock(
+    T_hand_eye.data(),
+    Sophus::SE3d::num_parameters,
+    parameterization
+  );
+
+  // Add T_eye_object parameters
+  for (Sophus::SE3d & T_eye_object: T_eye_objects) {
+    problem.AddParameterBlock(
+      T_eye_object.data(),
+      Sophus::SE3d::num_parameters,
+      parameterization
+    );
+  }
+
+  const auto pixel_loss = new ceres::HuberLoss(0.25);
+  const auto mount_loss = new ceres::HuberLoss(0.1);
+  for (size_t obs_idx = 0; obs_idx < observations.observations.size();
+    obs_idx++)
+  {
+    const auto & observation = observations.observations.at(obs_idx);
+
+    // 1) add the reprojection error cost for each obj point
+    for (size_t i = 0; i < mount.fiducial_corners.size(); i++) {
+      const auto obj_point = mount.fiducial_corners[i];
+      const auto img_point =
+        observation.chessboard_observations.corners[i].img_point;
+
+      problem.AddResidualBlock(
+        ReprojectionCostFunction::Create(
+          K_eig,
+          img_point,
+          obj_point
+        ),
+        pixel_loss,
+        T_eye_objects.at(obs_idx).data()
+      );
+
+    }
+
+    // add mount fiducial cost
+    problem.AddResidualBlock(
+      MountCostFunction2::Create(Sophus::SE3d{observation.T_world_mount}),
+      mount_loss,
+      T_eye_objects.at(obs_idx).data(),
+      T_mount_fiducial.data(),
+      T_world_eye.data()
+    );
+
+    // add hand eye cost
+    problem.AddResidualBlock(
+      HandErrorCostFunction2::Create(Sophus::SE3d{observation.T_world_cmount}),
+      mount_loss,
+      T_world_eye.data(),
+      T_hand_eye.data()
+    );
+  }
 
 
   // setup the solver
   ceres::Solver::Options ceres_solver_options;
   ceres_solver_options.sparse_linear_algebra_library_type =
     ceres::SUITE_SPARSE;
-  // ceres_solver_options.trust_region_strategy_type = ceres::DOGLEG;
-  // ceres_solver_options.dogleg_type = ceres::SUBSPACE_DOGLEG;
   ceres_solver_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
   ceres_solver_options.minimizer_progress_to_stdout = true;
   ceres_solver_options.max_num_iterations = 1000;
@@ -158,45 +223,38 @@ ExtrinsicCalibrationData optimize_extrinsics(
     );
   }
 
-  // mean /= inputs.T_eye_objects.size();
-  // std::cout << "Mean Chessboard to Camera Reprojection Error: " << mean <<
-  //   std::endl;
+  mean /= inputs.T_eye_objects.size();
+  std::cout << "Mean Chessboard to Camera Reprojection Error: " << mean <<
+    std::endl;
 
-  // // find average hand eye error
-  // mean = 0;
-  // for (size_t i = 0; i < inputs.T_eye_objects.size(); i++) {
-  //   double v = evaluate_hand_eye(
-  //     inputs.observations.observations[i],
-  //     T_hand_eye,
-  //     T_world_object,
-  //     K,
-  //     mount
-  //   );
-  //   mean += v;
-  // }
-  // mean /= inputs.T_eye_objects.size();
-  // std::cout << "Mean Hand Eye Reprojection Error: " << mean << std::endl;
+  // find the average mount error
+  mean = 0;
+  for (const auto & observation: observations.observations) {
+    for (size_t i = 0; i < mount.fiducial_corners.size(); i++) {
+      const auto & corner = mount.fiducial_corners[i];
+      const auto & img_point =
+        observation.chessboard_observations.corners[i].img_point;
 
+      Eigen::Vector4d p_camera = T_world_eye.inverse().matrix() *
+        observation.T_world_mount * T_mount_fiducial.matrix() *
+        corner.homogeneous();
 
-  // calculate T_world_object using each individual observation
-  // for (size_t i = 0; i < inputs.observations.observations.size(); i++) {
-  //   const Sophus::SE3d T_eye_object = inputs.T_eye_objects[i];
-  //   const ExtrinsicObservation & observation =
-  //     inputs.observations.observations[i];
+      Eigen::Vector2d p_image{
+        (p_camera.x() / p_camera.z()) * K.at<double>(0, 0) + K.at<double>(0, 2),
+        (p_camera.y() / p_camera.z()) * K.at<double>(1, 1) + K.at<double>(1, 2)
+      };
+      mean += std::fabs(img_point.x() - p_image.x());
+      mean += std::fabs(img_point.y() - p_image.y());
+    }
+  }
 
-  //   const Sophus::SE3d T_world_object_guess =
-  //     Sophus::SE3d{observation.T_world_cmount} *
-  //   T_hand_eye * T_eye_object;
+  mean /= (observations.observations.size() * 200);
+  std::cout << "Mean Mount Reprojection Error: " << mean << std::endl;
 
-  //   const Sophus::SE3d err = T_world_object_guess.inverse() * T_world_object;
-  //   std::cout << "Guess: " << err.translation().transpose() <<
-  //     std::endl;
-  // }
-
-  std::cout << T_world_object.matrix() << std::endl;
+  std::cout << T_world_eye.matrix() << std::endl;
 
   return {
-    {T_hand_eye, T_mount_fiducial, T_world_object},
+    {T_hand_eye, T_mount_fiducial},
     {}
   };
 }
@@ -396,9 +454,10 @@ double evaluate_observation(
     const auto & img_point =
       observation.chessboard_observations.corners[i].img_point;
 
-    Eigen::Vector4d p = extrinsics.T_world_object * corner.homogeneous();
+    Eigen::Vector4d p = observation.T_world_mount *
+      extrinsics.T_mount_fiducial.matrix() * corner.homogeneous();
     Eigen::Vector3d p_camera =
-      (extrinsics.T_x_camera.inverse().matrix() *
+      (extrinsics.T_hand_eye.inverse().matrix() *
       observation.T_world_cmount.inverse() * p).head<3>();
     Eigen::Vector2d p_image{
       (p_camera.x() / p_camera.z()) * K.at<double>(0, 0) + K.at<double>(0, 2),
@@ -479,6 +538,20 @@ double evaluate_hand_eye(
   }
   mean /= errors.size();
   return mean;
+}
+
+void to_json(json & j, const ExtrinsicCalibration & data)
+{
+  j = json{
+    {"T_hand_eye", data.T_hand_eye.matrix()},
+    {"T_mount_fiducial", data.T_mount_fiducial.matrix()}
+  };
+}
+
+void from_json(const json & j, ExtrinsicCalibration & data)
+{
+  data.T_hand_eye = Sophus::SE3d{j.at("T_hand_eye")};
+  data.T_mount_fiducial = Sophus::SE3d{j.at("T_mount_fiducial")};
 }
 
 }
