@@ -1,0 +1,6 @@
+include(CMakeFindDependencyMacro)
+
+find_dependency(OpenSSL REQUIRED COMPONENTS SSL Crypto)
+find_dependency(cpr REQUIRED)
+
+include(${CMAKE_CURRENT_LIST_DIR}/pi_eink-targets.cmake)

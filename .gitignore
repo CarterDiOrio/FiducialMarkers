@@ -6,3 +6,6 @@
 **/.cache/** 
 **/build/** 
 **/lib/** 
+**.json
+**.cameramodel
+**.cache/**
