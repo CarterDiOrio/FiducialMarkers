@@ -29,6 +29,20 @@ std::optional<Sophus::SE3d> get_object_transform(
     return {};
   }
 
+  // check if rotation is 0
+  if (std::fabs(segment_global_rotation.Rotation[0]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[1]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[2]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[3]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[4]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[5]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[6]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[7]) < 1e-6 &&
+    std::fabs(segment_global_rotation.Rotation[8]) < 1e-6)
+  {
+    return {};
+  }
+
   // Eigen::Map<Eigen::Matrix3d> rotation(segment_global_rotation.Rotation);
 
   // map rotation array to rotation matrix

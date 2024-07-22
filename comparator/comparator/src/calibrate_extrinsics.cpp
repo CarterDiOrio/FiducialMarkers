@@ -49,13 +49,33 @@ ExtrinsicObservations gather_vicon_measurements(
 
 void measure_vicon_variance();
 
+ExtrinsicObservations load_measurements_from_files(
+  const std::vector<std::string> & measurements_files) {
+  ExtrinsicObservations total;
+  for (const auto & measurements_file : measurements_files) {
+    std::cout << "Loading: " << measurements_file << std::endl;
+    std::ifstream file(measurements_file);
+    json j;
+    file >> j;
+    auto observations = j.get<ExtrinsicObservations>();
+    total.observations.insert(
+      total.observations.end(),
+      observations.observations.begin(),
+      observations.observations.end());
+  }
+  return total;
+}
+
 int main(int argc, char ** argv)
 {
   pi_eink::EinkClient client{"169.254.100.135:8080"};
 
   po::options_description desc("Allowed options");
   desc.add_options()("help", "produce help message")(
-    "measurements",
+    "camera_stationary",
+    po::value<std::vector<std::string>>()->multitoken(),
+    "Load measurements from a file to calculate extrinsics")(
+    "mount_stationary",
     po::value<std::vector<std::string>>()->multitoken(),
     "Load measurements from a file to calculate extrinsics")(
     "spline_model",
@@ -69,6 +89,10 @@ int main(int argc, char ** argv)
     "vicon_variance",
     po::value<std::string>()->default_value("n")->implicit_value("y"),
     "Measure the variance of the vicon system"
+  )(
+    "output",
+    po::value<std::string>()->default_value("measurements.json"),
+    "The output file for the measurements"
   );
 
   po::variables_map vm;
@@ -90,12 +114,20 @@ int main(int argc, char ** argv)
     return 0;
   }
 
-  std::vector<std::string> measurements_files;
+  std::vector<std::string> camera_stationary_files;
   try {
-    measurements_files =
-      vm["measurements"].as<std::vector<std::string>>();
+    camera_stationary_files =
+      vm["camera_stationary"].as<std::vector<std::string>>();
   } catch (boost::bad_any_cast _) {
   }
+
+  std::vector<std::string> mount_stationary_files;
+  try {
+    mount_stationary_files =
+      vm["mount_stationary"].as<std::vector<std::string>>();
+  } catch (boost::bad_any_cast _) {
+  }
+
 
   Eigen::Matrix4d fiducial_initial_guess = Eigen::Matrix4d::Identity();
 
@@ -105,135 +137,163 @@ int main(int argc, char ** argv)
     26,
     5.152);
 
-  ExtrinsicObservations measurements =
-    [&vm, &measurements_files]() {
-      if (!measurements_files.empty()) {
-        std::cout << "Loading measurements from file" << std::endl;
+  if (!camera_stationary_files.empty() || !mount_stationary_files.empty()) {
+    std::cout << "Loading Measurements from files...\n";
 
-        ExtrinsicObservations total;
-        for (const auto & measurements_file : measurements_files) {
-          std::cout << "Loading: " << measurements_file << std::endl;
-          std::ifstream file(measurements_file);
-          json j;
-          file >> j;
-          auto observations = j.get<ExtrinsicObservations>();
-          total.observations.insert(
-            total.observations.end(),
-            observations.observations.begin(),
-            observations.observations.end());
+    std::optional<ExtrinsicObservations> camera_stationary_observations;
+    if (!camera_stationary_files.empty()) {
+      camera_stationary_observations =
+        load_measurements_from_files(camera_stationary_files);
+    }
+
+    std::optional<ExtrinsicObservations> mount_stationary_observations;
+    if (!mount_stationary_files.empty()) {
+      mount_stationary_observations =
+        load_measurements_from_files(mount_stationary_files);
+    }
+
+    std::cout << "Loaded. Starting Optimization...\n";
+
+    // load lean lens model
+    const auto lean_lens_model = load_lens_model(
+      vm["pinhole_model"].as<std::string>());
+
+    /// get intrinsics from the lean lens model
+    const cv::Mat K = get_intrinsics_from_camera_model(*lean_lens_model);
+
+    Eigen::Matrix4d T_cmount_camera;
+    T_cmount_camera << 1, 0, 0, 0,
+      0, 0, 1, 0,
+      0, -1, 0, 0,
+      0, 0, 0, 1;
+
+    Eigen::Matrix4d T_mount_fiducial;
+    T_mount_fiducial << 1, 0, 0, 55,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1;
+
+    auto initial_guess = calibration::ExtrinsicCalibration::Identity();
+    initial_guess.T_hand_eye = Sophus::SE3d{T_cmount_camera};
+    initial_guess.T_mount_fiducial = Sophus::SE3d{T_mount_fiducial};
+
+
+    calibration::OptimizationInputs inputs {
+      .camera_stationary_observations = camera_stationary_observations,
+      .mount_stationary_observations = mount_stationary_observations,
+      .initial_guess = initial_guess
+    };
+
+    // calibrate the extrinsics
+    auto extrinsics_data = calibration::calibrate_extrinsics(
+      inputs,
+      chessboard,
+      K);
+
+    const auto extrinsics = extrinsics_data.calibration;
+
+    std::cout << "T_x_camera: \n" << extrinsics.T_hand_eye.matrix() << std::endl;
+    std::cout << "T_mount_fiducial: \n" << extrinsics.T_mount_fiducial.matrix() <<
+      std::endl;
+
+    // use the extrinsics to calculate the reprojection error
+    std::vector<double> errors;
+    std::vector<Eigen::Vector2d> reprojections;
+
+    if (camera_stationary_observations.has_value()) {
+      for (const auto & observation : camera_stationary_observations.value().observations) {
+        for (size_t i = 0; i < chessboard.fiducial_corners.size(); i++) {
+          const auto & corner = chessboard.fiducial_corners[i];
+          const auto & img_point =
+            observation.chessboard_observations.corners[i].img_point;
+
+          Eigen::Vector4d p = observation.T_world_mount *
+            extrinsics.T_mount_fiducial.matrix() * corner.homogeneous();
+          Eigen::Vector3d p_camera =
+            (extrinsics.T_hand_eye.inverse().matrix() *
+            observation.T_world_hand.inverse() * p).head<3>();
+          Eigen::Vector2d p_image{
+            (p_camera.x() / p_camera.z()) * K.at<double>(0, 0) + K.at<double>(0, 2),
+            (p_camera.y() / p_camera.z()) * K.at<double>(1, 1) + K.at<double>(1, 2)
+          };
+          errors.push_back(img_point.x() - p_image.x());
+          errors.push_back(img_point.y() - p_image.y());
+          reprojections.push_back(p_image);
         }
-        return total;
-      } else {
-
-        // create a MrCal based camera from the realsense
-        const auto rs_camera =
-          std::make_shared<RealSenseCamera>(1920, 1080, 30);
-        std::cout << "Constructed MrCal Camera..." << std::endl;
-        const auto camera = MrCalReprojectedCamera::from_files(
-          rs_camera,
-          vm["spline_model"].as<std::string>(),
-          vm["pinhole_model"].as<std::string>());
-        std::cout << "Finished";
-
-        // Gather measurements with the camera
-        return gather_vicon_measurements(*camera);
       }
-    }();
+    }
 
+    if (mount_stationary_observations.has_value()) {
+      for (const auto & observation : mount_stationary_observations.value().observations) {
+        for (size_t i = 0; i < chessboard.fiducial_corners.size(); i++) {
+          const auto & corner = chessboard.fiducial_corners[i];
+          const auto & img_point =
+            observation.chessboard_observations.corners[i].img_point;
 
-  std::cout << "Finished Gathering Measurements: " <<
-    measurements.observations.size() << std::endl;
+          Eigen::Vector4d p = observation.T_world_mount *
+            extrinsics.T_mount_fiducial.matrix() * corner.homogeneous();
+          Eigen::Vector3d p_camera =
+            (extrinsics.T_hand_eye.inverse().matrix() *
+            observation.T_world_hand.inverse() * p).head<3>();
+          Eigen::Vector2d p_image{
+            (p_camera.x() / p_camera.z()) * K.at<double>(0, 0) + K.at<double>(0, 2),
+            (p_camera.y() / p_camera.z()) * K.at<double>(1, 1) + K.at<double>(1, 2)
+          };
+          errors.push_back(img_point.x() - p_image.x());
+          errors.push_back(img_point.y() - p_image.y());
+          reprojections.push_back(p_image);
+        }
+      }
+    }
 
-  // write the measurements to a file
-  if (measurements_files.empty()) {
-    std::ofstream file("measurements.json");
+    // print the mean
+    double mean = 0;
+    for (const auto & r : errors) {
+      mean += std::fabs(r);
+    }
+    mean /= errors.size();
+    std::cout << "Mean: " << mean << std::endl;
+
+    std::ofstream residuals_file("residuals.txt");
+    for (size_t i = 0; i < reprojections.size(); i++) {
+      residuals_file << reprojections[i].x() << " " << reprojections[i].y()
+                    << " " << errors[i * 2] << " " << errors[i * 2 + 1] <<
+        std::endl;
+    }
+    residuals_file.close();
+
+    // write the extrinsics to a file
+    using namespace calibration;
+    std::ofstream extrinsics_file("extrinsics.json");
+    json j = extrinsics;
+    extrinsics_file << std::setw(1) << j << std::endl;
+    extrinsics_file.close();
+  }
+  else {
+    std::cout << "Starting Data Gathering...\n";
+    // create a MrCal based camera from the realsense
+    const auto rs_camera =
+      std::make_shared<RealSenseCamera>(1920, 1080, 30);
+    std::cout << "Constructed MrCal Camera..." << std::endl;
+    const auto camera = MrCalReprojectedCamera::from_files(
+      rs_camera,
+      vm["spline_model"].as<std::string>(),
+      vm["pinhole_model"].as<std::string>());
+
+    // Gather measurements with the camera
+    const auto measurements = gather_vicon_measurements(*camera);
+    std::cout << "Finished Gathering Measurements: " <<
+      measurements.observations.size() << std::endl;
+    
+    std::cout << "Writing to file..." << std::endl;
+
+    // write the measurements to a file
+    std::ofstream file(vm["output"].as<std::string>());
     json j = measurements;
     file << std::setw(1) << j << std::endl;
+
+    std::cout << "Done!" << std::endl;
   }
-
-  // load lean lens model
-  const auto lean_lens_model = load_lens_model(
-    vm["pinhole_model"].as<std::string>());
-
-  /// get intrinsics from the lean lens model
-  const cv::Mat K = get_intrinsics_from_camera_model(*lean_lens_model);
-
-  Eigen::Matrix4d T_cmount_camera;
-  T_cmount_camera << 1, 0, 0, 0,
-    0, 0, 1, 0,
-    0, -1, 0, 0,
-    0, 0, 0, 1;
-
-  Eigen::Matrix4d T_mount_fiducial;
-  T_mount_fiducial << 1, 0, 0, 55,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1;
-
-  auto initial_guess = calibration::ExtrinsicCalibration::Identity();
-  initial_guess.T_hand_eye = Sophus::SE3d{T_cmount_camera};
-  initial_guess.T_mount_fiducial = Sophus::SE3d{T_mount_fiducial};
-
-
-  // calibrate the extrinsics
-  auto extrinsics_data = calibration::calibrate_extrinsics(
-    measurements,
-    chessboard,
-    K,
-    initial_guess);
-
-  const auto extrinsics = extrinsics_data.calibration;
-
-  std::cout << "T_x_camera: \n" << extrinsics.T_hand_eye.matrix() << std::endl;
-  std::cout << "T_mount_fiducial: \n" << extrinsics.T_mount_fiducial.matrix() <<
-    std::endl;
-
-  // use the extrinsics to calculate the reprojection error
-  std::vector<double> errors;
-  std::vector<Eigen::Vector2d> reprojections;
-  for (const auto & observation : measurements.observations) {
-    for (size_t i = 0; i < chessboard.fiducial_corners.size(); i++) {
-      const auto & corner = chessboard.fiducial_corners[i];
-      const auto & img_point =
-        observation.chessboard_observations.corners[i].img_point;
-
-      Eigen::Vector4d p = observation.T_world_mount *
-        extrinsics.T_mount_fiducial.matrix() * corner.homogeneous();
-      Eigen::Vector3d p_camera =
-        (extrinsics.T_hand_eye.inverse().matrix() *
-        observation.T_world_cmount.inverse() * p).head<3>();
-      Eigen::Vector2d p_image{
-        (p_camera.x() / p_camera.z()) * K.at<double>(0, 0) + K.at<double>(0, 2),
-        (p_camera.y() / p_camera.z()) * K.at<double>(1, 1) + K.at<double>(1, 2)
-      };
-      errors.push_back(img_point.x() - p_image.x());
-      errors.push_back(img_point.y() - p_image.y());
-      reprojections.push_back(p_image);
-    }
-  }
-
-  // print the mean
-  double mean = 0;
-  for (const auto & r : errors) {
-    mean += std::fabs(r);
-  }
-  mean /= errors.size();
-  std::cout << "Mean: " << mean << std::endl;
-
-  std::ofstream residuals_file("residuals.txt");
-  for (size_t i = 0; i < reprojections.size(); i++) {
-    residuals_file << reprojections[i].x() << " " << reprojections[i].y()
-                   << " " << errors[i * 2] << " " << errors[i * 2 + 1] <<
-      std::endl;
-  }
-  residuals_file.close();
-
-  // write the extrinsics to a file
-  using namespace calibration;
-  std::ofstream extrinsics_file("extrinsics.json");
-  json j = extrinsics;
-  extrinsics_file << std::setw(1) << j << std::endl;
-  extrinsics_file.close();
 
   return 0;
 }
@@ -306,8 +366,8 @@ ExtrinsicObservations gather_vicon_measurements(
       std::vector<Sophus::SE3d> mount_measurements;
       std::vector<Sophus::SE3d> camera_measurements;
 
-      while (mount_measurements.size() < 10000 ||
-        camera_measurements.size() < 10000)
+      while (mount_measurements.size() < 100 ||
+        camera_measurements.size() < 100)
       {
         if (mount_measurements.size() % 100 == 0) {
           std::cout << "Iteration: " << mount_measurements.size() << std::endl;

@@ -16,7 +16,7 @@ struct ExtrinsicObservation
   Eigen::Matrix4d T_world_mount;
 
   /// \brief The transform from the camera mount to the world coordinates
-  Eigen::Matrix4d T_world_cmount;
+  Eigen::Matrix4d T_world_hand;
 
   /// \brief the observation of the chessboard in the image
   ChessboardObservation chessboard_observations;
@@ -29,7 +29,7 @@ struct ExtrinsicObservation
     const ChessboardObservation & chessboard_observation
   )
   : T_world_mount(T_world_mount),
-    T_world_cmount(T_world_cmount),
+    T_world_hand(T_world_cmount),
     chessboard_observations(chessboard_observation) {}
 };
 

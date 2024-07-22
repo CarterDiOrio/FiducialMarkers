@@ -10,57 +10,9 @@
 namespace calibration
 {
 
-
-struct MountErrorCostFunction
+struct StationaryHandCostFunction
 {
-  MountErrorCostFunction(
-    const Sophus::SE3d & T_world_mount_m
-  )
-  : T_world_mount_m{T_world_mount_m}
-  {
-  }
-
-  template<typename T>
-  bool operator()(
-    const T * T_world_object_param,
-    const T * T_mount_object_param,
-    T * residuals_ptr
-  ) const
-  {
-    using SE3 = Sophus::SE3<T>;
-
-    // map the input parameters to Sophus types
-    SE3 T_world_object = Eigen::Map<SE3 const>{T_world_object_param};
-    SE3 T_mount_object = Eigen::Map<SE3 const>{T_mount_object_param};
-
-    // calculate the pose graph error for the mount
-    const SE3 T_world_object_calc =
-      (T_world_mount_m * T_mount_object).inverse();
-
-    const SE3 err = T_world_object * T_world_object_calc;
-
-    // map the residuals
-    Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals{residuals_ptr};
-    residuals = err.log();
-
-    return true;
-  }
-
-  static ceres::CostFunction * Create(
-    const Sophus::SE3d & T_world_mount_m)
-  {
-    return new ceres::AutoDiffCostFunction<MountErrorCostFunction, 6,
-             Sophus::SE3d::num_parameters,
-             Sophus::SE3d::num_parameters>(
-      new MountErrorCostFunction(T_world_mount_m));
-  }
-
-  const Sophus::SE3d T_world_mount_m;
-};
-
-struct HandErrorCostFunction2
-{
-  HandErrorCostFunction2(
+  StationaryHandCostFunction(
     const Sophus::SE3d & T_world_hand_m
   )
   : T_world_hand_m{T_world_hand_m}
@@ -94,13 +46,58 @@ struct HandErrorCostFunction2
   static ceres::CostFunction * Create(
     const Sophus::SE3d & T_world_hand_m)
   {
-    return new ceres::AutoDiffCostFunction<HandErrorCostFunction2, 6,
+    return new ceres::AutoDiffCostFunction<StationaryHandCostFunction, 6,
              Sophus::SE3d::num_parameters,
              Sophus::SE3d::num_parameters>(
-      new HandErrorCostFunction2(T_world_hand_m));
+      new StationaryHandCostFunction(T_world_hand_m));
   }
 
   const Sophus::SE3d T_world_hand_m;
+};
+
+struct StationaryMountCostFunction
+{
+  StationaryMountCostFunction(
+    const Sophus::SE3d & T_world_mount_m
+  )
+  : T_world_mount_m{T_world_mount_m}
+  {
+  }
+
+  template<typename T>
+  bool operator()(
+    const T * T_world_object_param,
+    const T * T_mount_object_param,
+    T * residuals_ptr
+  ) const
+  {
+    using SE3 = Sophus::SE3<T>;
+
+    // map the input parameters to Sophus types
+    SE3 T_world_object = Eigen::Map<SE3 const>{T_world_object_param};
+    SE3 T_mount_object = Eigen::Map<SE3 const>{T_mount_object_param};
+
+    // calculate the pose graph error for the eye
+    const SE3 T_world_mount_est = T_world_object * T_mount_object.inverse();
+    const SE3 err = T_world_mount_m.inverse() * T_world_mount_est;
+
+    // map the residuals
+    Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals{residuals_ptr};
+    residuals = err.log();
+
+    return true;
+  }
+
+  static ceres::CostFunction * Create(
+    const Sophus::SE3d & T_world_hand_m)
+  {
+    return new ceres::AutoDiffCostFunction<StationaryMountCostFunction, 6,
+             Sophus::SE3d::num_parameters,
+             Sophus::SE3d::num_parameters>(
+      new StationaryMountCostFunction(T_world_hand_m));
+  }
+
+  const Sophus::SE3d T_world_mount_m;
 };
 
 }

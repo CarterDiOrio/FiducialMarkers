@@ -4,6 +4,7 @@
 #include "comparator/extrinsic_observation.hpp"
 #include "comparator/mount.hpp"
 #include "comparator/eigen_json.hpp"
+#include <memory>
 #include <sophus/se3.hpp>
 #include <ceres/problem.h>
 #include <nlohmann/json_fwd.hpp>
@@ -32,14 +33,13 @@ void from_json(const json & j, ExtrinsicCalibration & cal);
 struct OptimizationInputs
 {
   /// \brief The observations for the extrinsic calibration
-  ExtrinsicObservations observations;
+  std::optional<ExtrinsicObservations> camera_stationary_observations;
+
+  /// \brief The observations for the extrinsic calibration
+  std::optional<ExtrinsicObservations> mount_stationary_observations;
 
   /// \brief the initial guess of T_hand_camera and T_mount_fiducial
   ExtrinsicCalibration initial_guess;
-
-  /// \brief Initial transformation guesses from the calibration object to
-  /// the camera
-  std::vector<Sophus::SE3d> T_eye_objects;
 };
 
 struct ExtrinsicCalibrationData
@@ -50,10 +50,9 @@ struct ExtrinsicCalibrationData
 
 /// \brief Calibrates the extrinsics of the system
 ExtrinsicCalibrationData calibrate_extrinsics(
-  ExtrinsicObservations & observations,
+  OptimizationInputs & inputs,
   const Mount & mount,
-  const cv::Mat & K,
-  const ExtrinsicCalibration & initial_guess = ExtrinsicCalibration::Identity()
+  const cv::Mat & K
 );
 
 /// \brief Optimizes the extrinsics of the system
@@ -63,31 +62,32 @@ ExtrinsicCalibrationData optimize_extrinsics(
   const cv::Mat & K
 );
 
-/// \brief Adds the hand-eye calibration problem to the ceres problem
-void add_hand_eye_problem(
-  ceres::Problem & problem,
-  Sophus::SE3d & T_hand_eye,
-  Sophus::SE3d & T_world_object,
-  std::vector<Sophus::SE3d> & T_eye_objects,
-  const ExtrinsicObservations & observations,
-  const Mount & mount,
-  const cv::Mat & K
-);
+struct ProblemOutput {
+  std::vector<Sophus::SE3d> T_eye_objects;
+  std::unique_ptr<Sophus::SE3d> transform;
+};
 
-/// \brief Adds the mount calibration problem to the ceres problem
-void add_mount_fiducial_problem(
-  ceres::Problem & problem,
-  Sophus::SE3d & T_mount_fiducial,
-  Sophus::SE3d & T_world_object,
-  const ExtrinsicObservations & observations
-);
+
+ProblemOutput add_camera_stationary(ceres::Problem & problem,
+                           Sophus::SE3d & T_hand_eye,
+                           Sophus::SE3d & T_mount_object,
+                           const Mount & mount,
+                           const cv::Mat & K,
+                           const ExtrinsicObservations & observations);
+
+ProblemOutput add_mount_stationary(ceres::Problem & problem,
+                          Sophus::SE3d & T_hand_eye,
+                          Sophus::SE3d & T_mount_object,
+                          const Mount & mount,
+                          const cv::Mat & K,
+                          const ExtrinsicObservations & observations);
+
 
 /// \brief Seeds an initial guess for the extrinsic calibration
 /// \param observations The observations to seed the calibration with
 /// \param mount The mount used in the observations
 std::vector<Sophus::SE3d> seed_extrinsic_calibration(
   const ExtrinsicObservations & observations,
-  const ExtrinsicCalibration & initial_guess,
   const Mount & mount,
   const cv::Mat & K
 );
