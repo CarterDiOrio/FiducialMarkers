@@ -35,15 +35,6 @@ struct MobileMountCostFunction
     SE3 T_world_eye = Eigen::Map<SE3 const>{T_world_eye_param};
 
     // calculate the pose graph error for the mount
-    // SE3 T_world_mount_est = T_world_eye * T_eye_object *
-    //   T_mount_object.inverse();
-
-    // const SE3 err1 = T_world_mount_m.inverse() * T_world_mount_est;
-
-    // SE3 T_world_object_est = T_world_mount_m * T_mount_object;
-    // SE3 T_world_object_meas = T_world_eye * T_eye_object;
-    // const SE3 err = T_world_object_est.inverse() * T_world_object_meas; 
-
     SE3 T_mount_object_est = T_world_mount_m.inverse() * T_world_eye * T_eye_object;
     SE3 T_mount_object_meas = T_mount_object;
 
@@ -96,6 +87,8 @@ struct MobileHandCostFunction
 
     const SE3 err = T_eye_object.inverse() *
       (T_world_eye.inverse() * T_world_object);
+
+    // const SE3 err = T_world_hand_m.inverse() * (T_world_object * T_eye_object.inverse() * T_hand_eye.inverse());
 
     //map the residuals
     Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals{residuals_ptr};

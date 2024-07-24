@@ -2,11 +2,14 @@
 #define INC_GUARD_CAMERA_HPP
 
 #include <opencv2/core.hpp>
+#include <Eigen/Dense>
 
 /// \brief Interface modeling a generic camera.
 class CameraIntf
 {
 public:
+  virtual ~CameraIntf() = default;
+
   /// \brief Gets the resolution of the Camera in pixels
   /// \return The resolution of the camera {width, height}
   virtual cv::Size get_resolution() const = 0;

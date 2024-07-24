@@ -40,8 +40,11 @@ def plot_residuals(residuals_file):
         
         residual_norms.append(np.sqrt(residual.x_residual**2 + residual.y_residual**2))
 
+    rms = np.sqrt(np.mean(np.array(combined_xy_residuals)**2))
+
     print('Mean residual norm:', np.mean(residual_norms))
     print('Std dev: ', np.std(residual_norms))
+    print("rms: ", rms)
 
     print('Mean X and Y: ', np.mean(np.fabs(combined_xy_residuals)))
     print('Std dev X and Y: ', np.std(np.fabs(combined_xy_residuals)))

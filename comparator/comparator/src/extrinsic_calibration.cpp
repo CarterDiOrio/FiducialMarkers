@@ -110,35 +110,50 @@ ExtrinsicCalibrationData optimize_extrinsics(
   size_t count = 0;
   if (camera_stationary_output.has_value()) {
     for (size_t i = 0; i < camera_stationary_output.value().T_eye_objects.size(); i++) {
-      mean += evaluate_pnp(
+      double v = evaluate_pnp(
         inputs.camera_stationary_observations.value().observations[i],
         camera_stationary_output.value().T_eye_objects[i],
         K,
         mount
       );
+      mean += v*v;
       count++;
     }
   }
 
   if (mount_stationary_output.has_value()) {
     for (size_t i = 0; i < mount_stationary_output.value().T_eye_objects.size(); i++) {
-      mean += evaluate_pnp(
+      double v = evaluate_pnp(
         inputs.mount_stationary_observations.value().observations[i],
         mount_stationary_output.value().T_eye_objects[i],
         K,
         mount
       );
+      mean += v*v;
       count++;
     }
   }
   mean /= count;
-  std::cout << "Eye Object Reprojection Error: " << mean << std::endl;
+  const double rms = std::sqrt(mean); 
+  std::cout << "Eye Object RMS RPE: " << rms << std::endl;
 
   // T_world_camera T_mount_object Reprojection Error
+  double translation_err = 0.0;
+  size_t tcount = 0;
   if (camera_stationary_output.has_value()) {
     Sophus::SE3d T_world_eye = *camera_stationary_output.value().transform;
     mean = 0;
-    for (const auto & observation: inputs.camera_stationary_observations->observations) {
+    for (size_t idx = 0; idx < inputs.camera_stationary_observations->observations.size(); idx++) {
+      const auto& observation = inputs.camera_stationary_observations->observations.at(idx); 
+      
+      const Sophus::SE3d T_eye_object_est = 
+        (Sophus::SE3d{observation.T_world_hand} * T_hand_eye).inverse() *
+        (Sophus::SE3d{observation.T_world_mount} * T_mount_fiducial); 
+
+      const Sophus::SE3d err = T_eye_object_est.inverse() * camera_stationary_output.value().T_eye_objects.at(idx);
+      translation_err += err.translation().norm();
+      tcount++;
+
       for (size_t i = 0; i < mount.fiducial_corners.size(); i++) {
         const auto & corner = mount.fiducial_corners[i];
         const auto & img_point =
@@ -167,7 +182,18 @@ ExtrinsicCalibrationData optimize_extrinsics(
   if (mount_stationary_output.has_value()) {
     Sophus::SE3d T_world_object = *mount_stationary_output.value().transform;
     mean = 0;
-    for (const auto & observation: inputs.mount_stationary_observations->observations) {
+    for (size_t idx = 0; idx < inputs.mount_stationary_observations->observations.size(); idx++) {
+      const auto& observation = inputs.mount_stationary_observations->observations.at(idx);
+
+      const Sophus::SE3d T_eye_object_est = 
+        (Sophus::SE3d{observation.T_world_hand} * T_hand_eye).inverse() *
+        (Sophus::SE3d{observation.T_world_mount} * T_mount_fiducial); 
+
+      const Sophus::SE3d err = T_eye_object_est.inverse() * mount_stationary_output.value().T_eye_objects.at(idx);
+      translation_err += err.translation().norm();
+      tcount ++;
+
+
       for (size_t i = 0; i < mount.fiducial_corners.size(); i++) {
         const auto & corner = mount.fiducial_corners[i];
         const auto & img_point =
@@ -191,6 +217,7 @@ ExtrinsicCalibrationData optimize_extrinsics(
     std::cout << T_world_object.matrix() << std::endl;
   }
 
+  std::cout << "Mean Translation Error: " << translation_err / tcount  << std::endl;
 
 
   return {
@@ -232,8 +259,8 @@ ProblemOutput add_camera_stationary(
     );
   }
 
-  const auto pixel_loss = new ceres::HuberLoss(0.25);
-  const auto mount_loss = new ceres::HuberLoss(0.1);
+  const auto pixel_loss = new ceres::HuberLoss(1.0);
+  const auto mount_loss = new ceres::HuberLoss(0.5);
   for (size_t obs_idx = 0; obs_idx < observations.observations.size();
     obs_idx++)
   {
@@ -312,7 +339,7 @@ ProblemOutput add_mount_stationary(
   }
 
   const auto pixel_loss = new ceres::HuberLoss(0.25);
-  const auto mount_loss = new ceres::HuberLoss(0.1);
+  const auto mount_loss = new ceres::HuberLoss(0.5);
   for (size_t obs_idx = 0; obs_idx < observations.observations.size();
     obs_idx++)
   {

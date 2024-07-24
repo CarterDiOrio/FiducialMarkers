@@ -4,6 +4,7 @@
 #include <librealsense2/h/rs_sensor.h>
 #include <librealsense2/hpp/rs_frame.hpp>
 #include <librealsense2/hpp/rs_pipeline.hpp>
+#include <librealsense2/hpp/rs_processing.hpp>
 #include <librealsense2/rs.hpp>
 #include "comparator/camera.hpp"
 
@@ -21,7 +22,6 @@ public:
   )
   : CameraIntf()
   {
-    rs2::config cfg;
     cfg.enable_stream(
       RS2_STREAM_COLOR, width, height, RS2_FORMAT_BGR8,
       framerate);
@@ -84,7 +84,10 @@ public:
   }
 
 private:
+  rs2::config cfg;
   rs2::pipeline pipeline;
 };
+
+
 
 #endif

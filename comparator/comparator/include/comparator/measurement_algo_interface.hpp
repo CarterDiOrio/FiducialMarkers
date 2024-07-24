@@ -8,6 +8,8 @@
 class MeasurementAlgoInterface
 {
 public:
+  virtual ~MeasurementAlgoInterface() = default;
+
   virtual std::string get_name() = 0;
   virtual void display() = 0;
   virtual std::optional<Sophus::SE3d> detect() = 0;

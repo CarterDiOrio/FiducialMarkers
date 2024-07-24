@@ -82,16 +82,12 @@ if(BUILD_CLIENT)
     src/client.cpp
   )
 
-  add_executable(eink_cli
-    src/eink_cli.cpp
-  )
 
   target_link_libraries(eink_client PRIVATE
                                     cpr::cpr
                                     nlohmann_json::nlohmann_json
                                     ${OPENSSL_LIBRARIES})
 
-  target_link_libraries(eink_cli PRIVATE eink_client Boost::program_options)
 
   target_include_directories(eink_client
     PUBLIC
@@ -99,10 +95,10 @@ if(BUILD_CLIENT)
     $<INSTALL_INTERFACE:include/>)
 
   target_compile_options(eink_client PUBLIC -Wall -Wextra -pedantic -fPIC)
-  target_compile_features(eink_client PUBLIC cxx_std_20)
+  target_compile_features(eink_client PUBLIC cxx_std_23)
 
   install(DIRECTORY include/pi_eink DESTINATION include)
-  install(TARGETS eink_client eink_cli EXPORT pi_eink-targets)
+  install(TARGETS eink_client EXPORT pi_eink-targets)
 
   if (BUILD_CLIENT_TEST)
 

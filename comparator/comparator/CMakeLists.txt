@@ -54,6 +54,7 @@ add_library(comparator
 
 add_executable(calibrate_extrinsics src/calibrate_extrinsics.cpp)
 add_executable(take_measurements src/take_measurements.cpp)
+add_executable(realsense_depth_test src/realsense_depth_test.cpp)
 
 find_package(
     Boost REQUIRED COMPONENTS program_options filesystem 
@@ -74,6 +75,7 @@ target_link_libraries(comparator PUBLIC
                                  pi_eink::eink_client)
 target_link_libraries(calibrate_extrinsics comparator)
 target_link_libraries(take_measurements comparator)
+target_link_libraries(realsense_depth_test comparator)
 
 # Use target_include_directories so that #include"mylibrary/header.hpp" works
 # The use of the <BUILD_INTERFACE> and <INSTALL_INTERFACE> is because when
@@ -96,11 +98,15 @@ target_include_directories(take_measurements
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
   $<INSTALL_INTERFACE:include/>)
 
+target_include_directories(realsense_depth_test
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>)
+
 target_compile_options(comparator PUBLIC -Wall -Wextra -pedantic)
 target_compile_options(calibrate_extrinsics PUBLIC -Wall -Wextra -pedantic)
 # target_compile_options(chessboard_test PUBLIC -Wall -Wextra -pedantic)
 
-target_compile_features(comparator PUBLIC cxx_std_20)
-target_compile_features(calibrate_extrinsics PUBLIC cxx_std_20)
-# target_compile_features(chessboard_test PUBLIC cxx_std_20)
+target_compile_features(comparator PUBLIC cxx_std_23)
+target_compile_features(calibrate_extrinsics PUBLIC cxx_std_23)
+# target_compile_features(chessboard_test PUBLIC cxx_std_23)
 

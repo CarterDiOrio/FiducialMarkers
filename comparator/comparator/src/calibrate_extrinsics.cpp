@@ -24,6 +24,7 @@
 #include <memory>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
+#include <opencv2/core/hal/interface.h>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
@@ -305,7 +306,7 @@ ExtrinsicObservations gather_vicon_measurements(
   std::cout << "Connecting to the vicon server..." << std::endl;
   const auto & client = []()
     {
-      std::string server{"169.254.100.131:801"};
+      std::string server{"169.168.10.5:801"};
       auto client = vicon::connect_to_server(server);
       client | vicon::EnableMarkerData | vicon::EnableSegmentData;
       client->SetStreamMode(datastream::StreamMode::ClientPull);
@@ -355,6 +356,29 @@ ExtrinsicObservations gather_vicon_measurements(
       /// quit taking measurements
       break;
     } else if (c == 's' && maybe_observation.has_value()) {
+
+      //average images
+      cv::Mat uimg = cv::Mat::zeros(gray.size(), CV_64F);
+      cv::Mat corner_img;
+      for (size_t i = 0; i < 300; i++) {
+        auto img = camera.get_frame();
+        cv::Mat gray;
+
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+        cv::Mat temp;
+        gray.convertTo(temp, CV_64F);
+        uimg += gray;
+
+
+        uimg.convertTo(corner_img, CV_8U, 1.0 / (i + 1.0));
+        cv::imshow("frame ", corner_img);
+        cv::waitKey(1);
+      }
+
+      // find corners
+      const auto observation = mrgingham_find_chessboard(
+      corner_img, 26).value();
+      
 
       // the rotation averaging operation is not well defined, so we rely on the
       // measurements of the vicon being pretty accurate already to get good
@@ -461,7 +485,7 @@ ExtrinsicObservations gather_vicon_measurements(
       observations.observations.emplace_back(
         T_wm.matrix(),
         T_wc.matrix(),
-        *maybe_observation
+        observation
       );
     }
     cv::imshow("frame ", img);
