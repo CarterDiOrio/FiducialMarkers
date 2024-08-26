@@ -7,7 +7,8 @@
 ScaledCamera::ScaledCamera(
   std::shared_ptr<CameraIntf> camera,
   double scaled_factor
-) : camera(camera), scale_factor(scaled_factor)
+)
+: camera(camera), scale_factor(scaled_factor)
 {}
 
 void ScaledCamera::set_scale(double scaled_factor)
@@ -32,9 +33,9 @@ cv::Mat ScaledCamera::get_frame() const
 cv::Mat ScaledCamera::get_intrinsics() const
 {
   cv::Mat intrinsics = camera->get_intrinsics();
-  intrinsics.at<double>(0, 0) *= scale_factor * 0.66;
-  intrinsics.at<double>(1, 1) *= scale_factor * 0.66;
-  intrinsics.at<double>(0, 2) *= scale_factor * 0.66;
-  intrinsics.at<double>(1, 2) *= scale_factor * 0.66;
+  intrinsics.at<double>(0, 0) *= scale_factor;
+  intrinsics.at<double>(1, 1) *= scale_factor;
+  intrinsics.at<double>(0, 2) *= scale_factor;
+  intrinsics.at<double>(1, 2) *= scale_factor;
   return intrinsics;
 }
